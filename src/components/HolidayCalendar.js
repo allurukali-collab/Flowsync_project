@@ -154,12 +154,72 @@ const holidays = {
       { date: '25-12-2025', day: 'Thursday', type: 'Bank Holiday', occasion: 'Christmas Day' },
       { date: '26-12-2025', day: 'Friday', type: 'Bank Holiday', occasion: 'Boxing Day' },
     ],
-  }
+  },
+  '2026': {
+  'ind-blr': [
+    { date: '01-01-2026', day: 'Thursday', type: 'Annual Holiday', occasion: 'New Year' },
+    { date: '26-01-2026', day: 'Monday', type: 'Annual Holiday', occasion: 'Republic Day' },
+    { date: '04-03-2026', day: 'Wednesday', type: 'Restricted Holiday', occasion: 'Holi' },
+    { date: '03-04-2026', day: 'Friday', type: 'Restricted Holiday', occasion: 'Good Friday' },
+    { date: '20-03-2026', day: 'Friday', type: 'Restricted Holiday', occasion: 'Ugadi' },
+    { date: '19-07-2026', day: 'Sunday', type: 'Restricted Holiday', occasion: 'Bakrid/Eid al Adha' },
+    { date: '15-08-2026', day: 'Saturday', type: 'Annual Holiday', occasion: 'Independence Day' },
+    { date: '02-10-2026', day: 'Friday', type: 'Annual Holiday', occasion: 'Gandhi Jayanti' },
+    { date: '08-11-2026', day: 'Sunday', type: 'Annual Holiday', occasion: 'Diwali' },
+  ],
+
+  'usa-ny': [
+    { date: '01-01-2026', day: 'Thursday', type: 'Federal Holiday', occasion: 'New Year' },
+    { date: '19-06-2026', day: 'Friday', type: 'Federal Holiday', occasion: 'Juneteenth' },
+    { date: '04-07-2026', day: 'Saturday', type: 'Federal Holiday', occasion: 'Independence Day' },
+    { date: '26-11-2026', day: 'Thursday', type: 'Federal Holiday', occasion: 'Thanksgiving Day' },
+    { date: '25-12-2026', day: 'Friday', type: 'Federal Holiday', occasion: 'Christmas Day' },
+  ],
+
+  'uk-ldn': [
+    { date: '01-01-2026', day: 'Thursday', type: 'Bank Holiday', occasion: 'New Year' },
+    { date: '03-04-2026', day: 'Friday', type: 'Bank Holiday', occasion: 'Good Friday' },
+    { date: '06-04-2026', day: 'Monday', type: 'Bank Holiday', occasion: 'Easter Monday' },
+    { date: '31-08-2026', day: 'Monday', type: 'Bank Holiday', occasion: 'Summer Bank Holiday' },
+    { date: '25-12-2026', day: 'Friday', type: 'Bank Holiday', occasion: 'Christmas Day' },
+    { date: '28-12-2026', day: 'Monday', type: 'Bank Holiday', occasion: 'Boxing Day (substitute)' },
+  ],
+},
+'2027': {
+  'ind-blr': [
+    { date: '01-01-2027', day: 'Friday', type: 'Annual Holiday', occasion: 'New Year' },
+    { date: '26-01-2027', day: 'Tuesday', type: 'Annual Holiday', occasion: 'Republic Day' },
+    { date: '22-03-2027', day: 'Monday', type: 'Restricted Holiday', occasion: 'Holi' },
+    { date: '26-03-2027', day: 'Friday', type: 'Restricted Holiday', occasion: 'Good Friday' },
+    { date: '09-08-2027', day: 'Monday', type: 'Restricted Holiday', occasion: 'Bakrid/Eid al Adha' },
+    { date: '15-08-2027', day: 'Sunday', type: 'Annual Holiday', occasion: 'Independence Day' },
+    { date: '02-10-2027', day: 'Saturday', type: 'Annual Holiday', occasion: 'Gandhi Jayanti' },
+    { date: '28-10-2027', day: 'Thursday', type: 'Annual Holiday', occasion: 'Diwali' },
+  ],
+
+  'usa-ny': [
+    { date: '01-01-2027', day: 'Friday', type: 'Federal Holiday', occasion: 'New Year' },
+    { date: '19-06-2027', day: 'Saturday', type: 'Federal Holiday', occasion: 'Juneteenth' },
+    { date: '04-07-2027', day: 'Sunday', type: 'Federal Holiday', occasion: 'Independence Day' },
+    { date: '25-11-2027', day: 'Thursday', type: 'Federal Holiday', occasion: 'Thanksgiving Day' },
+    { date: '25-12-2027', day: 'Saturday', type: 'Federal Holiday', occasion: 'Christmas Day' },
+  ],
+
+  'uk-ldn': [
+    { date: '01-01-2027', day: 'Friday', type: 'Bank Holiday', occasion: 'New Year' },
+    { date: '26-03-2027', day: 'Friday', type: 'Bank Holiday', occasion: 'Good Friday' },
+    { date: '29-03-2027', day: 'Monday', type: 'Bank Holiday', occasion: 'Easter Monday' },
+    { date: '30-08-2027', day: 'Monday', type: 'Bank Holiday', occasion: 'Summer Bank Holiday' },
+    { date: '27-12-2027', day: 'Monday', type: 'Bank Holiday', occasion: 'Christmas Day (substitute)' },
+    { date: '28-12-2027', day: 'Tuesday', type: 'Bank Holiday', occasion: 'Boxing Day (substitute)' },
+  ],
+},
+
 };
 
 function HolidayCalendar() {
   const [location, setLocation] = useState('ind-blr');
-  const [year, setYear] = useState('2025');
+  const [year, setYear] = useState('2026');
   const navigate = useNavigate();
   const [toastState, setToastState] = useState({ show: false, message: "", type: "" });
   const triggerToast = (message, type) => {
@@ -283,6 +343,8 @@ function HolidayCalendar() {
               <MenuItem value="2023">2023</MenuItem>
               <MenuItem value="2024">2024</MenuItem>
               <MenuItem value="2025">2025</MenuItem>
+              <MenuItem value="2026">2026</MenuItem>
+              <MenuItem value="2027">2027</MenuItem>
             </Select>
           </FormControl>
 
