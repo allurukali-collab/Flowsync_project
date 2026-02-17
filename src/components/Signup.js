@@ -27,6 +27,9 @@ function Signup() {
     e.preventDefault();
     setIsLoading(true);
 
+    
+
+
     try {
       const response = await fetch("http://localhost:8080/api/auth/login", {
         method: "POST",
@@ -68,6 +71,11 @@ function Signup() {
     }, 1000);
   };
 
+  const handleCancel = () => {
+  setEmpId("");
+  setPassword("");
+  setShowPassword(false);
+};
   return (
     <>
       <div className="signup-container" style={{ position: "relative" }}>
@@ -136,7 +144,7 @@ function Signup() {
               <button
                 type="button"
                 className="cancel"
-                onClick={() => navigate("/")}
+                onClick={handleCancel}
               >
                 Cancel
               </button>
