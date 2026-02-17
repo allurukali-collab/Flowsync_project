@@ -210,3 +210,8 @@ body {
   color: gray;
   font-size: 12px;
 }
+
+.card-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}

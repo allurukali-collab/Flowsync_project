@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
+import api from "../utils/api"; 
 
 function Signup() {
   const [empId, setEmpId] = useState("");
@@ -23,43 +24,45 @@ function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
 
-    try {
-      const response = await fetch("http://localhost:8080/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          employeeId: empId,
-          password: password,
-        }),
-      });
+const handleSignup = async (e) => {
+  e.preventDefault();
+  setIsLoading(true);
 
-      const data = await response.json();
-     
-      if (!response.ok) {
-        triggerToast(data.message || "Wrong Password", "error");
-        setIsLoading(false);
-        return;
-      }
+  try {
+    // ✅ Use api instance instead of fetch
+    const response = await api.post("/api/auth/login", {
+      employeeId: empId,
+      password: password,
+    });
 
-      localStorage.setItem("user", JSON.stringify(data));
-      triggerToast("Signed in successfully!", "success");
+    const data = response.data; // ✅ Axios returns data in .data
 
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 1000);
-    } catch (err) {
-      triggerToast("Server not reachable", "error");
-      setIsLoading(false);
-    }
+    // ✅ Save user data
+    localStorage.setItem("user", JSON.stringify(data));
     
-  };
-  
+    console.log("✅ User logged in:", data);
+    
+    triggerToast("Signed in successfully!", "success");
+
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 1000);
+    
+  } catch (err) {
+    console.error("❌ Login error:", err);
+    
+    // ✅ Better error handling
+    const errorMessage = err.response?.data?.message || 
+                         err.message || 
+                         "Server not reachable";
+    
+    triggerToast(errorMessage, "error");
+    
+  } finally {
+    setIsLoading(false); // ✅ Always stop loading
+  }
+};
 
   const triggerToast = (message, type) => {
     setToastState({ show: true, message, type });

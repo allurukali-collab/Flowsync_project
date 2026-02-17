@@ -32,6 +32,7 @@ import ArrowBackIosIcon from "@mui/icons-material/ArrowBackIos";
 const TimesheetTable = ({ empID, projectId }) => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user"));
+
   const [codingValues, setCodingValues] = useState([0, 0, 0, 0, 0, 0, 0]);
   const [testingValues, setTestingValues] = useState([0, 0, 0, 0, 0, 0, 0]);
   const [devopsValues, setDevopsValues] = useState([0, 0, 0, 0, 0, 0, 0]);
@@ -53,16 +54,16 @@ const TimesheetTable = ({ empID, projectId }) => {
   const [results, setResults] = useState([]);
   const [editedValues, setEditedValues] = useState(Array(7).fill(false));
   const [editedTestingValues, setEditedTestingValues] = useState(
-    Array(7).fill(false)
+    Array(7).fill(false),
   );
   const [editedDevopsValues, setEditedDevopsValues] = useState(
-    Array(7).fill(false)
+    Array(7).fill(false),
   );
   const [editedMeetingValues, setEditedMeetingValues] = useState(
-    Array(7).fill(false)
+    Array(7).fill(false),
   );
   const [editedDataValues, setEditedDataValues] = useState(
-    Array(7).fill(false)
+    Array(7).fill(false),
   );
   const [editedTaValues, setEditedTaValues] = useState(Array(7).fill(false));
   const [editedTdValues, setEditedTdValues] = useState(Array(7).fill(false));
@@ -72,7 +73,7 @@ const TimesheetTable = ({ empID, projectId }) => {
   const [editedAcValues, setEditedAcValues] = useState(Array(7).fill(false));
   const [editedMisValues, setEditedMisValues] = useState(Array(7).fill(false));
   const [workStatusValues, setWorkStatusValues] = useState(
-    Array(7).fill("WFO")
+    Array(7).fill("WFO"),
   );
   const [open, setOpen] = React.useState(false);
   const [successSnackbarOpen, setSuccessSnackbarOpen] = React.useState(false);
@@ -91,10 +92,24 @@ const TimesheetTable = ({ empID, projectId }) => {
   });
   const [effort, setEffort] = useState(" ");
   const [effortDate, setEffortDate] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
+  // const [employeeId, setEmployeeId] = useState("");
+  const employeeId = user?.employeeId;
   const [effort_task_description, setEffort_task_description] = useState("");
   const [loading, setLoading] = useState(false);
   const [blurScreen, setBlurScreen] = useState(false);
+  const [allowedModules, setAllowedModules] = useState([]);
+
+  useEffect(() => {
+    if (!employeeId) return;
+
+    fetch(`http://localhost:8080/api/employee/modules?employeeId=${employeeId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Allowed Modules:", data);
+        setAllowedModules(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => console.error("Module fetch error:", err));
+  }, [employeeId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -108,7 +123,7 @@ const TimesheetTable = ({ empID, projectId }) => {
         const today = new Date();
         const startOfWeek = new Date(today);
         startOfWeek.setDate(
-          today.getDate() - today.getDay() + 1 + 7 * weekOffset
+          today.getDate() - today.getDay() + 1 + 7 * weekOffset,
         );
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(endOfWeek.getDate() + 6);
@@ -122,12 +137,12 @@ const TimesheetTable = ({ empID, projectId }) => {
               startDate: formattedStartDate,
               endDate: formattedEndDate,
             },
-          }
+          },
         );
 
         console.log(
           "Time Management Response Data:",
-          timeManagementResponse.data
+          timeManagementResponse.data,
         );
         const results = timeManagementResponse.data;
         console.log("Results:", results);
@@ -249,69 +264,69 @@ const TimesheetTable = ({ empID, projectId }) => {
         setEditedMisValues(Array(7).fill(false));
         setCodingValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 1) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 1) || 0,
+          ),
         );
         setTestingValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 2) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 2) || 0,
+          ),
         );
 
         setDevopsValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 3) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 3) || 0,
+          ),
         );
         setMeetingValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 4) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 4) || 0,
+          ),
         );
         setDataValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 5) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 5) || 0,
+          ),
         );
         setTaValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 6) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 6) || 0,
+          ),
         );
         setTdValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 8) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 8) || 0,
+          ),
         );
         setEeValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 9) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 9) || 0,
+          ),
         );
         setPmValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 10) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 10) || 0,
+          ),
         );
         setCbValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 11) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 11) || 0,
+          ),
         );
         setAcValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 12) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 12) || 0,
+          ),
         );
         setMisValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 7) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 7) || 0,
+          ),
         );
         setTotalValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 0) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 0) || 0,
+          ),
         );
         setEditedValues(Array(7).fill(false));
         setEditedTestingValues(Array(7).fill(false));
@@ -353,69 +368,69 @@ const TimesheetTable = ({ empID, projectId }) => {
 
         setCodingValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 1) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 1) || 0,
+          ),
         );
         setTestingValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 2) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 2) || 0,
+          ),
         );
         setDevopsValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 3) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 3) || 0,
+          ),
         );
         setMeetingValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 4) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 4) || 0,
+          ),
         );
         setDataValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 5) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 5) || 0,
+          ),
         );
         setTaValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 6) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 6) || 0,
+          ),
         );
         setTdValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 8) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 8) || 0,
+          ),
         );
         setEeValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 9) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 9) || 0,
+          ),
         );
         setPmValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 10) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 10) || 0,
+          ),
         );
         setCbValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 11) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 11) || 0,
+          ),
         );
         setAcValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 12) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 12) || 0,
+          ),
         );
         setMisValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 7) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 7) || 0,
+          ),
         );
 
         setTotalValues((prevValues) =>
           prevValues.map(
-            (_, index) => handleEffort(dates[daysOfWeek[index]], 0) || 0
-          )
+            (_, index) => handleEffort(dates[daysOfWeek[index]], 0) || 0,
+          ),
         );
 
         setEditedValues(Array(7).fill(false));
@@ -441,7 +456,7 @@ const TimesheetTable = ({ empID, projectId }) => {
     const currentWeekOffset =
       new Date().getDay() === 0 ? weekOffset - 1 : weekOffset;
     const offsetDate = new Date(
-      today.setDate(today.getDate() + 7 * currentWeekOffset)
+      today.setDate(today.getDate() + 7 * currentWeekOffset),
     );
     const currentDay = today.getDay();
     if (currentWeekOffset >= -2 && currentWeekOffset <= 0) {
@@ -880,68 +895,68 @@ const TimesheetTable = ({ empID, projectId }) => {
   const handleCancel = () => {
     setCodingValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 1) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 1) || 0,
+      ),
     );
     setTestingValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 2) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 2) || 0,
+      ),
     );
     setDevopsValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 3) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 3) || 0,
+      ),
     );
     setMeetingValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 4) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 4) || 0,
+      ),
     );
     setDataValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 5) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 5) || 0,
+      ),
     );
     setTaValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 6) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 6) || 0,
+      ),
     );
     setTdValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 8) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 8) || 0,
+      ),
     );
     setEeValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 9) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 9) || 0,
+      ),
     );
     setPmValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 10) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 10) || 0,
+      ),
     );
     setCbValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 11) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 11) || 0,
+      ),
     );
     setAcValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 12) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 12) || 0,
+      ),
     );
     setMisValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 7) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 7) || 0,
+      ),
     );
     setTotalValues((prevValues) =>
       prevValues.map(
-        (_, index) => handleEffort(dates[daysOfWeek[index]], 0) || 0
-      )
+        (_, index) => handleEffort(dates[daysOfWeek[index]], 0) || 0,
+      ),
     );
   };
 
@@ -950,7 +965,7 @@ const TimesheetTable = ({ empID, projectId }) => {
       (entry) =>
         entry.effortDate === date1 &&
         entry.taskId === intValue1 &&
-        entry.employeeId === empID
+        entry.employeeId === empID,
     );
     if (totalEntry) {
       return totalEntry.effort;
@@ -996,10 +1011,9 @@ const TimesheetTable = ({ empID, projectId }) => {
       },
     },
   });
-
   const handleEffort = (date, intValue, index) => {
     const matchingEntry = results.find(
-      (entry) => entry.effortDate === date && entry.taskId === intValue
+      (entry) => entry.effortDate === date && entry.taskId === intValue,
     );
     if (matchingEntry) {
       console.log("Effort Date:", date);
@@ -1359,43 +1373,47 @@ const TimesheetTable = ({ empID, projectId }) => {
           <ArrowBackIosIcon fontSize="30" />
         </IconButton>
 
-{user?.role !== "employee" && (
-        <Button
-          variant="outlined"
-          className="sidebar-button"
-          onClick={() => navigate("/approvals")}
-          sx={{
-            height: 50, // fixed pixel height
-            lineHeight: "50px", // center text vertically
-          }}
-        >
-          APPROVALS
-        </Button>
-)}
-        <Button variant="outlined" 
-        className="sidebar-button"
-        onClick={() => navigate("/leaveReconcilation")}
-        >
-          LEAVE RECONCILIATION
-        </Button>
-        <Button
-        onClick={() => navigate("/leavepage")}
-          variant="outlined"
-          className="sidebar-button"
-          sx={{
-            height: 50, // fixed pixel height
-            lineHeight: "50px", // center text vertically
-          }}
-        >
-          LEAVE
-        </Button>
-        <Button
-          variant="outlined"
-          className="sidebar-button"
-          onClick={() => navigate("/holidaycalendar")}
-        >
-          HOLIDAY CALENDAR
-        </Button>
+        {allowedModules.includes("APPROVALS") && (
+          <Button
+            variant="outlined"
+            className="sidebar-button"
+            onClick={() => navigate("/approvals")}
+            sx={{ height: 50, lineHeight: "50px" }}
+          >
+            APPROVALS
+          </Button>
+        )}
+
+        {allowedModules.includes("LEAVE_RECONCILIATION") && (
+          <Button
+            variant="outlined"
+            className="sidebar-button"
+            onClick={() => navigate("/leaveReconcilation")}
+          >
+            LEAVE RECONCILIATION
+          </Button>
+        )}
+
+        {allowedModules.includes("LEAVE") && (
+          <Button
+            variant="outlined"
+            className="sidebar-button"
+            onClick={() => navigate("/leavepage")}
+            sx={{ height: 50, lineHeight: "50px" }}
+          >
+            LEAVE
+          </Button>
+        )}
+
+        {allowedModules.includes("HOLIDAY_CALENDAR") && (
+          <Button
+            variant="outlined"
+            className="sidebar-button"
+            onClick={() => navigate("/holidaycalendar")}
+          >
+            HOLIDAY CALENDAR
+          </Button>
+        )}
       </Grid>
 
       {loading && (
@@ -1411,7 +1429,7 @@ const TimesheetTable = ({ empID, projectId }) => {
         </div>
       )}
       <Grid item xs={10} className={`wrapper ${blurScreen ? "blur" : ""}`}>
-        <h1 className="title">Work Tracker</h1>
+        <h1 className="title">Worksheet Tracker</h1>
         <p style={{ display: "none" }}>Project ID: {projectId}</p>
         {results.map((item, index) => (
           <p style={{ display: "none" }} key={index}>
@@ -1423,7 +1441,7 @@ const TimesheetTable = ({ empID, projectId }) => {
           sx={{ width: "110%", marginTop: "3%" }}
         >
           <Table sx={{ minWidth: 800 }} aria-label="simple table">
-            <TableHead style={{ maxHeight: "50px",border:'1px solid grey' }}>
+            <TableHead style={{ maxHeight: "50px", border: "1px solid grey" }}>
               <TableRow
                 style={{
                   backgroundColor: theme.palette.primary.main,
@@ -1649,11 +1667,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                         onChange={(event) => {
                           const inputValue = event.target.value.replace(
                             /\D/g,
-                            ""
+                            "",
                           );
                           handleCodingChange(
                             index,
-                            inputValue === "" ? 0 : parseInt(inputValue, 10)
+                            inputValue === "" ? 0 : parseInt(inputValue, 10),
                           );
                           setEditedValues((prevEditedValues) => {
                             const newEditedValues = [...prevEditedValues];
@@ -1666,7 +1684,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                           handleBlurEvent(
                             1,
                             dates[daysOfWeek[index]],
-                            event.target.value
+                            event.target.value,
                           );
                         }}
                         onKeyDown={handleKeyDown}
@@ -1730,11 +1748,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                         onChange={(event) => {
                           const inputValue = event.target.value.replace(
                             /\D/g,
-                            ""
+                            "",
                           );
                           handleTestingChange(
                             index,
-                            inputValue === "" ? 0 : parseInt(inputValue, 10)
+                            inputValue === "" ? 0 : parseInt(inputValue, 10),
                           );
                           setEditedTestingValues((prevEditedValues) => {
                             const newEditedValues = [...prevEditedValues];
@@ -1747,7 +1765,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                           handleBlurEvent(
                             2,
                             dates[daysOfWeek[index]],
-                            event.target.value
+                            event.target.value,
                           );
                         }}
                         onKeyDown={handleKeyDown1}
@@ -1811,11 +1829,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                         onChange={(event) => {
                           const inputValue = event.target.value.replace(
                             /\D/g,
-                            ""
+                            "",
                           );
                           handleDevopsChange(
                             index,
-                            inputValue === "" ? 0 : parseInt(inputValue, 10)
+                            inputValue === "" ? 0 : parseInt(inputValue, 10),
                           );
                           setEditedDevopsValues((prevEditedValues) => {
                             const newEditedValues = [...prevEditedValues];
@@ -1828,7 +1846,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                           handleBlurEvent(
                             3,
                             dates[daysOfWeek[index]],
-                            event.target.value
+                            event.target.value,
                           );
                         }}
                         onKeyDown={handleKeyDown2}
@@ -1891,11 +1909,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                       onChange={(event) => {
                         const inputValue = event.target.value.replace(
                           /\D/g,
-                          ""
+                          "",
                         );
                         handleMeetingChange(
                           index,
-                          inputValue === "" ? 0 : parseInt(inputValue, 10)
+                          inputValue === "" ? 0 : parseInt(inputValue, 10),
                         );
                         setEditedMeetingValues((prevEditedValues) => {
                           const newEditedValues = [...prevEditedValues];
@@ -1908,7 +1926,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                         handleBlurEvent(
                           4,
                           dates[daysOfWeek[index]],
-                          event.target.value
+                          event.target.value,
                         );
                       }}
                       onKeyDown={handleKeyDown3}
@@ -1971,11 +1989,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                         onChange={(event) => {
                           const inputValue = event.target.value.replace(
                             /\D/g,
-                            ""
+                            "",
                           );
                           handleDataChange(
                             index,
-                            inputValue === "" ? 0 : parseInt(inputValue, 10)
+                            inputValue === "" ? 0 : parseInt(inputValue, 10),
                           );
                           setEditedDataValues((prevEditedValues) => {
                             const newEditedValues = [...prevEditedValues];
@@ -1988,7 +2006,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                           handleBlurEvent(
                             5,
                             dates[daysOfWeek[index]],
-                            event.target.value
+                            event.target.value,
                           );
                         }}
                         onKeyDown={handleKeyDown4}
@@ -2012,7 +2030,6 @@ const TimesheetTable = ({ empID, projectId }) => {
                   ))}
                 </TableRow>
               )}
-
               {projectId !== Taskname.stibiumProjectId &&
                 projectId !== Taskname.aomaDeliveryProjectId &&
                 projectId !== Taskname.aomaPromoProjectId &&
@@ -2062,11 +2079,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                           onChange={(event) => {
                             const inputValue = event.target.value.replace(
                               /\D/g,
-                              ""
+                              "",
                             );
                             handleTaChange(
                               index,
-                              inputValue === "" ? 0 : parseInt(inputValue, 10)
+                              inputValue === "" ? 0 : parseInt(inputValue, 10),
                             );
                             setEditedTaValues((prevEditedValues) => {
                               const newEditedValues = [...prevEditedValues];
@@ -2079,7 +2096,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                             handleBlurEvent(
                               6,
                               dates[daysOfWeek[index]],
-                              event.target.value
+                              event.target.value,
                             );
                           }}
                           onKeyDown={handleKeyDown5}
@@ -2153,11 +2170,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                           onChange={(event) => {
                             const inputValue = event.target.value.replace(
                               /\D/g,
-                              ""
+                              "",
                             );
                             handleTdChange(
                               index,
-                              inputValue === "" ? 0 : parseInt(inputValue, 10)
+                              inputValue === "" ? 0 : parseInt(inputValue, 10),
                             );
                             setEditedTdValues((prevEditedValues) => {
                               const newEditedValues = [...prevEditedValues];
@@ -2170,7 +2187,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                             handleBlurEvent(
                               8,
                               dates[daysOfWeek[index]],
-                              event.target.value
+                              event.target.value,
                             );
                           }}
                           onKeyDown={handleKeyDown7}
@@ -2244,11 +2261,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                           onChange={(event) => {
                             const inputValue = event.target.value.replace(
                               /\D/g,
-                              ""
+                              "",
                             );
                             handleEeChange(
                               index,
-                              inputValue === "" ? 0 : parseInt(inputValue, 10)
+                              inputValue === "" ? 0 : parseInt(inputValue, 10),
                             );
                             setEditedEeValues((prevEditedValues) => {
                               const newEditedValues = [...prevEditedValues];
@@ -2261,7 +2278,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                             handleBlurEvent(
                               9,
                               dates[daysOfWeek[index]],
-                              event.target.value
+                              event.target.value,
                             );
                           }}
                           onKeyDown={handleKeyDown8}
@@ -2335,11 +2352,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                           onChange={(event) => {
                             const inputValue = event.target.value.replace(
                               /\D/g,
-                              ""
+                              "",
                             );
                             handlePmChange(
                               index,
-                              inputValue === "" ? 0 : parseInt(inputValue, 10)
+                              inputValue === "" ? 0 : parseInt(inputValue, 10),
                             );
                             setEditedPmValues((prevEditedValues) => {
                               const newEditedValues = [...prevEditedValues];
@@ -2352,7 +2369,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                             handleBlurEvent(
                               10,
                               dates[daysOfWeek[index]],
-                              event.target.value
+                              event.target.value,
                             );
                           }}
                           onKeyDown={handleKeyDown9}
@@ -2426,11 +2443,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                           onChange={(event) => {
                             const inputValue = event.target.value.replace(
                               /\D/g,
-                              ""
+                              "",
                             );
                             handleCbChange(
                               index,
-                              inputValue === "" ? 0 : parseInt(inputValue, 10)
+                              inputValue === "" ? 0 : parseInt(inputValue, 10),
                             );
                             setEditedCbValues((prevEditedValues) => {
                               const newEditedValues = [...prevEditedValues];
@@ -2443,7 +2460,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                             handleBlurEvent(
                               11,
                               dates[daysOfWeek[index]],
-                              event.target.value
+                              event.target.value,
                             );
                           }}
                           onKeyDown={handleKeyDown10}
@@ -2517,11 +2534,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                           onChange={(event) => {
                             const inputValue = event.target.value.replace(
                               /\D/g,
-                              ""
+                              "",
                             );
                             handleAcChange(
                               index,
-                              inputValue === "" ? 0 : parseInt(inputValue, 10)
+                              inputValue === "" ? 0 : parseInt(inputValue, 10),
                             );
                             setEditedAcValues((prevEditedValues) => {
                               const newEditedValues = [...prevEditedValues];
@@ -2534,7 +2551,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                             handleBlurEvent(
                               12,
                               dates[daysOfWeek[index]],
-                              event.target.value
+                              event.target.value,
                             );
                           }}
                           onKeyDown={handleKeyDown11}
@@ -2597,11 +2614,11 @@ const TimesheetTable = ({ empID, projectId }) => {
                       onChange={(event) => {
                         const inputValue = event.target.value.replace(
                           /\D/g,
-                          ""
+                          "",
                         );
                         handleMisChange(
                           index,
-                          inputValue === "" ? 0 : parseInt(inputValue, 10)
+                          inputValue === "" ? 0 : parseInt(inputValue, 10),
                         );
                         setEditedMisValues((prevEditedValues) => {
                           const newEditedValues = [...prevEditedValues];
@@ -2614,7 +2631,7 @@ const TimesheetTable = ({ empID, projectId }) => {
                         handleBlurEvent(
                           7,
                           dates[daysOfWeek[index]],
-                          event.target.value
+                          event.target.value,
                         );
                       }}
                       onKeyDown={handleKeyDown6}
@@ -2640,17 +2657,17 @@ const TimesheetTable = ({ empID, projectId }) => {
 
               <TableRow>
                 <TableCell
-                   size="small"  // This reduces default padding
-    sx={{ 
-      backgroundColor: "#676c71", 
-      color: "white", 
-      fontSize: "14px", 
-      textAlign: "center", 
-      fontFamily: "Arial", 
-      height: "20px",
-      lineHeight: "20px",
-      padding: "2px 4px",  // Minimal padding
-    }}
+                  size="small" // This reduces default padding
+                  sx={{
+                    backgroundColor: "#676c71",
+                    color: "white",
+                    fontSize: "14px",
+                    textAlign: "center",
+                    fontFamily: "Arial",
+                    height: "20px",
+                    lineHeight: "20px",
+                    padding: "2px 4px", // Minimal padding
+                  }}
                 >
                   Work Status
                 </TableCell>
