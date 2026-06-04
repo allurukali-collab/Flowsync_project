@@ -20,6 +20,7 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import "./../style/Timesheet.css";
 // import Navbar from './Navbar';
 import axios from "axios";
+import { getAuthHeaders } from "../utils/api";
 import Snackbar from "@mui/material/Snackbar";
 import MuiAlert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -102,7 +103,9 @@ const TimesheetTable = ({ empID, projectId }) => {
   useEffect(() => {
     if (!employeeId) return;
 
-    fetch(`http://localhost:8080/api/employee/modules?employeeId=${employeeId}`)
+    fetch(`http://localhost:8080/api/employee/modules?employeeId=${employeeId}`, {
+      headers: getAuthHeaders(),
+    })
       .then((res) => res.json())
       .then((data) => {
         console.log("Allowed Modules:", data);
@@ -130,13 +133,22 @@ const TimesheetTable = ({ empID, projectId }) => {
         const formattedStartDate = getFormattedDate(startOfWeek);
         const formattedEndDate = getFormattedDate(endOfWeek);
 
+        const finalEmployeeId = empID || employeeId || user?.employeeId;
+
+        if (!finalEmployeeId) {
+          console.error("Employee ID not found");
+          return;
+        }
+
         const timeManagementResponse = await axios.get(
-          `/stubium/employee/${empID}/effortDateRange`,
+          "http://localhost:8080/timesheet/entries",
           {
             params: {
-              startDate: formattedStartDate,
-              endDate: formattedEndDate,
+              employeeId: Number(finalEmployeeId),
+              fromDate: convertDateFormat(formattedStartDate),
+              toDate: convertDateFormat(formattedEndDate),
             },
+            headers: getAuthHeaders(),
           },
         );
 
@@ -346,7 +358,7 @@ const TimesheetTable = ({ empID, projectId }) => {
     }
   };
 
-  const handleArrowLeftClick = () => {
+ const handleArrowLeftClick = () => {
     if (weekOffset > -2) {
       setBlurScreen(true);
       setLoading(true);
@@ -1011,35 +1023,91 @@ const TimesheetTable = ({ empID, projectId }) => {
       },
     },
   });
-  const handleEffort = (date, intValue, index) => {
-    const matchingEntry = results.find(
-      (entry) => entry.effortDate === date && entry.taskId === intValue,
+ const handleEffort = (date, intValue) => {
+  if (!date) return 0;
+
+  const convertedDate = convertDateFormat(date);
+
+  const matchingEntry = results.find(
+    (entry) =>
+      entry.effortDate === convertedDate &&
+      entry.taskId === intValue
+  );
+
+  return matchingEntry ? matchingEntry.effort : 0;
+};
+
+  const isAlreadySubmitted = (date, taskId) => {
+    if (!date) return false;
+
+    const finalEmployeeId = empID || employeeId || user?.employeeId;
+    const convertedDate = convertDateFormat(date);
+
+    return results.some(
+      (entry) =>
+        entry.effortDate === convertedDate &&
+        entry.taskId === taskId &&
+        Number(entry.employeeId) === Number(finalEmployeeId)
     );
-    if (matchingEntry) {
-      console.log("Effort Date:", date);
-      console.log("Task Id:", intValue);
-      console.log("Matching Effort:", matchingEntry.effort);
-      return matchingEntry.effort;
-    }
-    return 0;
   };
 
   const handleBlurEvent = (taskId, effortDate, typedValue) => {
+    if (!effortDate) return;
+
+    const finalEmployeeId = empID || employeeId || user?.employeeId;
+    const effortNumber = Number(typedValue);
+
+    if (!finalEmployeeId) {
+      setWarningMessage("Employee ID not found. Please logout and login again.");
+      setOpen(true);
+      return;
+    }
+
+    if (!effortNumber || effortNumber <= 0) {
+      return;
+    }
+
     const convertedEffortDate = convertDateFormat(effortDate);
 
     const newData = {
       taskId: taskId,
       effortDate: convertedEffortDate,
-      effort: typedValue,
-      employeeId: empID,
-      project_id: projectId,
-      effort_task_description: getTaskDescription(taskId),
+      effort: effortNumber,
+      employeeId: Number(finalEmployeeId),
+      projectId: String(projectId || "PROJECT-1"),
+      effortTaskDescription: getTaskDescription(taskId),
+      workStatus: "WFO",
     };
-    setFormData((prevData) => [...prevData, newData]);
+
+    setFormData((prevData) => {
+      const filteredData = prevData.filter(
+        (item) =>
+          !(
+            item.taskId === newData.taskId &&
+            item.effortDate === newData.effortDate &&
+            item.employeeId === newData.employeeId
+          )
+      );
+
+      return [...filteredData, newData];
+    });
   };
 
   const convertDateFormat = (oldFormat) => {
-    const [dd, mm, yy] = oldFormat.split("-");
+    if (!oldFormat) return "";
+
+    const parts = oldFormat.split("-");
+
+    if (parts.length !== 3) {
+      return oldFormat;
+    }
+
+    const [dd, mm, yy] = parts;
+
+    if (yy && yy.length === 4) {
+      return `${yy}-${mm}-${dd}`;
+    }
+
     const convertedDate = `20${yy}-${mm}-${dd}`;
     return convertedDate;
   };
@@ -1073,30 +1141,128 @@ const TimesheetTable = ({ empID, projectId }) => {
     }
   };
 
-  const handleSubmit = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/stibium/recordwork", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
+const handleSubmit = async () => {
+  const finalEmployeeId = empID || employeeId || user?.employeeId;
 
-      if (response.ok) {
-        console.log("API call successful");
-        setFormData([]);
-        setSuccessSnackbarOpen(true);
-      } else {
-        console.error("API call failed");
-      }
-    } catch (error) {
-      console.error("Error during API call:", error);
-    } finally {
-      setLoading(false);
+  if (!finalEmployeeId) {
+    setWarningMessage("Employee ID not found. Please logout and login again.");
+    setOpen(true);
+    return;
+  }
+
+  const taskRows = [
+    { taskId: 1, values: codingValues },
+    { taskId: 2, values: testingValues },
+    { taskId: 3, values: devopsValues },
+    { taskId: 4, values: meetingValues },
+    { taskId: 5, values: dataValues },
+    { taskId: 6, values: taValues },
+    { taskId: 7, values: misValues },
+    { taskId: 8, values: tdValues },
+    { taskId: 9, values: eeValues },
+    { taskId: 10, values: pmValues },
+    { taskId: 11, values: cbValues },
+    { taskId: 12, values: acValues },
+  ];
+
+  const finalFormData = [];
+
+  for (let i = 0; i < daysOfWeek.length; i++) {
+    const totalHours = Number(handleSum1(i));
+
+    if (totalHours === 0) continue;
+
+    if (totalHours !== 8) {
+      setWarningMessage(
+        `${daysOfWeek[i].toUpperCase()} must contain exactly 8 hours. Otherwise it will be considered as Leave/Holiday.`
+      );
+      setOpen(true);
+      return;
     }
-  };
+
+    const dayKey = daysOfWeek[i];
+    const effortDate = convertDateFormat(dates[dayKey]);
+
+    taskRows.forEach((row) => {
+      const effort = Number(row.values[i] || 0);
+
+      if (effort > 0) {
+        finalFormData.push({
+          taskId: row.taskId,
+          effortDate: effortDate,
+          effort: effort,
+          employeeId: Number(finalEmployeeId),
+          projectId: String(projectId || "PROJECT-1"),
+          effortTaskDescription: getTaskDescription(row.taskId),
+          workStatus: workStatusValues[i] || "WFO",
+        });
+      }
+    });
+  }
+
+  if (finalFormData.length === 0) {
+    setWarningMessage("Please enter timesheet data before submitting.");
+    setOpen(true);
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    console.log("Submitting timesheet payload:", finalFormData);
+
+    const response = await fetch("http://localhost:8080/timesheet/entries", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(finalFormData),
+    });
+
+    if (!response.ok) {
+      const errorMessage = await response.text();
+      setWarningMessage(errorMessage || "Timesheet submit failed.");
+      setOpen(true);
+      return;
+    }
+
+    setFormData([]);
+    setSuccessSnackbarOpen(true);
+
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(
+      today.getDate() - today.getDay() + 1 + 7 * weekOffset
+    );
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+
+    const formattedStartDate = getFormattedDate(startOfWeek);
+    const formattedEndDate = getFormattedDate(endOfWeek);
+
+    const refreshResponse = await axios.get(
+      "http://localhost:8080/timesheet/entries",
+      {
+        params: {
+          employeeId: Number(finalEmployeeId),
+          fromDate: convertDateFormat(formattedStartDate),
+          toDate: convertDateFormat(formattedEndDate),
+        },
+        headers: getAuthHeaders(),
+      }
+    );
+
+    setResults(refreshResponse.data);
+  } catch (error) {
+    console.error("Error during API call:", error);
+    setWarningMessage("Server error. Please check backend is running.");
+    setOpen(true);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSuccessSnackbarClose = (event, reason) => {
     if (reason === "clickaway") {
@@ -1350,7 +1516,7 @@ const TimesheetTable = ({ empID, projectId }) => {
       {/* 👉 Sidebar with buttons */}
       <Grid
         item
-        xs={4}
+        xs={8}
         sx={{
           display: "flex",
           flexDirection: "column",
@@ -1370,7 +1536,7 @@ const TimesheetTable = ({ empID, projectId }) => {
             position: "absolute",
           }}
         >
-          <ArrowBackIosIcon fontSize="30" />
+          <ArrowBackIosIcon  sx={{ fontSize: 30 }} />
         </IconButton>
 
         {allowedModules.includes("APPROVALS") && (
@@ -1701,7 +1867,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                             },
                           },
                           disableUnderline: true,
-                          disabled: isFutureDay(index + 1),
+                          disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 1),
                         }}
                       />
                     </TableCell>
@@ -1782,7 +1950,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                             },
                           },
                           disableUnderline: true,
-                          disabled: isFutureDay(index + 1),
+                          disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 2),
                         }}
                       />
                     </TableCell>
@@ -1863,7 +2033,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                             },
                           },
                           disableUnderline: true,
-                          disabled: isFutureDay(index + 1),
+                          disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 3),
                         }}
                       />
                     </TableCell>
@@ -1943,7 +2115,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                           },
                         },
                         disableUnderline: true,
-                        disabled: isFutureDay(index + 1),
+                        disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 4),
                       }}
                     />
                   </TableCell>
@@ -2023,7 +2197,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                             },
                           },
                           disableUnderline: true,
-                          disabled: isFutureDay(index + 1),
+                          disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 5),
                         }}
                       />
                     </TableCell>
@@ -2113,7 +2289,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                               },
                             },
                             disableUnderline: true,
-                            disabled: isFutureDay(index + 1),
+                            disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 6),
                           }}
                         />
                       </TableCell>
@@ -2204,7 +2382,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                               },
                             },
                             disableUnderline: true,
-                            disabled: isFutureDay(index + 1),
+                            disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 8),
                           }}
                         />
                       </TableCell>
@@ -2295,7 +2475,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                               },
                             },
                             disableUnderline: true,
-                            disabled: isFutureDay(index + 1),
+                            disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 9),
                           }}
                         />
                       </TableCell>
@@ -2386,7 +2568,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                               },
                             },
                             disableUnderline: true,
-                            disabled: isFutureDay(index + 1),
+                            disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 10),
                           }}
                         />
                       </TableCell>
@@ -2477,7 +2661,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                               },
                             },
                             disableUnderline: true,
-                            disabled: isFutureDay(index + 1),
+                            disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 11),
                           }}
                         />
                       </TableCell>
@@ -2568,7 +2754,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                               },
                             },
                             disableUnderline: true,
-                            disabled: isFutureDay(index + 1),
+                            disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 12),
                           }}
                         />
                       </TableCell>
@@ -2648,7 +2836,9 @@ const TimesheetTable = ({ empID, projectId }) => {
                           },
                         },
                         disableUnderline: true,
-                        disabled: isFutureDay(index + 1),
+                        disabled:
+                            isFutureDay(index + 1) ||
+                            isAlreadySubmitted(dates[daysOfWeek[index]], 7),
                       }}
                     />
                   </TableCell>
@@ -2796,33 +2986,30 @@ const TimesheetTable = ({ empID, projectId }) => {
             horizontal: "right",
           }}
         >
-          <Alert onClose={handleClose} severity="error" sx={{ width: "100%" }}>
-            Please enter a number between 0 and 24
-          </Alert>
+           <Alert
+    onClose={handleClose}
+    severity="warning"
+    sx={{ width: "100%" }}
+  >      
+    {warningMessage}
+  </Alert>
         </Snackbar>
 
-        <Snackbar
-          open={successSnackbarOpen}
-          autoHideDuration={3000}
-          onClose={handleSuccessSnackbarClose}
-          anchorOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-        >
-          <MuiAlert
-            onClose={handleSuccessSnackbarClose}
-            severity="success"
-            sx={{
-              width: "100%",
-              height: "70%",
-              backgroundColor: "#2e7d32",
-              color: "#ffffff",
-            }}
-          >
-            Details submitted successfully!
-          </MuiAlert>
-        </Snackbar>
+       <Snackbar
+  open={successSnackbarOpen}
+  autoHideDuration={3000}
+  onClose={handleSuccessSnackbarClose}
+  anchorOrigin={{ vertical: "top", horizontal: "right" }}
+>
+  <Alert
+    onClose={handleSuccessSnackbarClose}
+    severity="success"
+    sx={{ width: "100%" }}
+  >
+    Timesheet submitted successfully
+  </Alert>
+</Snackbar>
+
       </Grid>
     </Grid>
   );

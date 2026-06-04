@@ -35,12 +35,15 @@ function Signup() {
       password: password,
     });
 
-    const data = response.data; // ✅ Axios returns data in .data
+    const data = response.data; //  Axios returns data in .data
 
-    // ✅ Save user data
+    //  Save user data and token
     localStorage.setItem("user", JSON.stringify(data));
+    if (data.token) {
+      localStorage.setItem("token", data.token);
+    }
     
-    console.log("✅ User logged in:", data);
+    console.log(" User logged in:", data);
     
     triggerToast("Signed in successfully!", "success");
 

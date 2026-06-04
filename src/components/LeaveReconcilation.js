@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 //import './App.css';
 import {
   Table,
@@ -27,7 +27,7 @@ import {
   Grid,
   TableContainer
 } from "@mui/material";
- //import Grid from '@mui/material/Unstable_Grid2';
+//import Grid from '@mui/material/Unstable_Grid2';
 import MuiAlert from "@mui/material/Alert";
 import { Link } from "react-router-dom";
 import CloseIcon from "@mui/icons-material/Close";
@@ -68,8 +68,13 @@ const CloseIconButton = styled(IconButton)({
   transform: "translateY(-50%)",
 });
 
-export default function LeaveReconcilation({ empID, projectId }) {
+export default function LeaveReconcilation({ projectId }) {
+  const API_BASE = "http://localhost:8080";
+  const user = JSON.parse(localStorage.getItem("user"));
+  const empID = user?.employeeId;
+  const employeeName = user?.employeeName || user?.name || "";
   const navigate = useNavigate();
+
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [codingValues, setCodingValues] = React.useState(0);
   const [testingValues, setTestingValues] = React.useState(0);
@@ -90,69 +95,100 @@ export default function LeaveReconcilation({ empID, projectId }) {
   const [result1, setResult1] = useState();
   const [reconciliationDate, setReconciliationDate] = useState(null);
   const [results, setResults] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [taskId, setTaskId] = useState(null);
   const [successSnackbarOpen, setSuccessSnackbarOpen] = React.useState(false);
+  const [apiErrorSnackbarOpen, setApiErrorSnackbarOpen] = useState(false);
+  const [apiErrorMessage, setApiErrorMessage] = useState("");
+
+  // keep the rest of your file exactly same
+
+
+
   const handleSnackbarClose = (event, reason) => {
     if (reason === "clickaway") {
       return;
     }
     setSnackbarOpen(false);
   };
-  
-  //dummy rows
-  const [leaveDays, setLeaveDays] = useState([
-    { reconciliation_date: "01-07-25", status: "Open", reason: "" },
-    {
-      reconciliation_date: "28-06-25",
-      status: "Resolved",
-      reason: "Missed Timesheet",
-    },
-  ]);
-  
 
+  const [leaveDays, setLeaveDays] = useState([]);
   const [oldReasons, setOldReasons] = useState([]);
   const [formData, setFormData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [noRowSelectedSnackbarOpen, setNoRowSelectedSnackbarOpen] =
-    useState(false);
+  const [noRowSelectedSnackbarOpen, setNoRowSelectedSnackbarOpen] = useState(false);
 
-useEffect(() => {
-  setLoading(false); // simulate fetch complete
+const getTodayFormatted = () => {
+  // This avoids any UTC shift
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const localDate = new Date(now - offset);
+  return localDate.toISOString().split("T")[0]; // gives "2026-05-14"
+};
 
-  const mockLeaveDays = [
-    { reconciliation_date: "01-07-25", status: "Open", reason: "" },
-    { reconciliation_date: "28-06-25", status: "Resolved", reason: "Missed Timesheet" },
-    
-  ];
+  const isOpenRow = (row) => String(row?.status || "").toLowerCase() === "open";
 
-  const mockResults = [
-    { effortDate: "01-07-25", taskId: 1, effort: 2 },
-    { effortDate: "01-07-25", taskId: 2, effort: 3 },
-    { effortDate: "01-07-25", taskId: 3, effort: 1 },
-  ];
+  const buildRowsWithOpenRow = (data) => {
+    const normalizedRows = Array.isArray(data)
+      ? data.map((row) => ({
+          ...row,
+          reconciliationDate:
+            row.reconciliationDate || row.reconciliation_date || getTodayFormatted(),
+          status: row.status || "Open",
+          reason: row.reason || "",
+        }))
+      : [];
 
-  setLeaveDays(mockLeaveDays);
-  setOldReasons(mockLeaveDays.map((ld) => ld.reason));
-  setReasons(mockLeaveDays.map((ld) =>
-    ld.status === "Rejected" || ld.status === "Pending" ? ld.reason : ""
-  ));
-  setResults(mockResults);
-}, []);
+    const hasOpenRow = normalizedRows.some((row) => isOpenRow(row));
 
+    if (!hasOpenRow) {
+      normalizedRows.unshift({
+        reconciliationDate: getTodayFormatted(),
+        status: "Open",
+        reason: "",
+      });
+    }
 
-  const [reasons, setReasons] = useState(leaveDays.map(() => ""));
+    return normalizedRows;
+  };
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/leavereconciliation/${empID}`);
+      const data = await res.json();
+
+      const finalRows = buildRowsWithOpenRow(data);
+
+      setLeaveDays(finalRows);
+      setReasons(finalRows.map((row) => row.reason || ""));
+      setOldReasons(finalRows.map((row) => row.reason || ""));
+      setLoading(false);
+    } catch (err) {
+      console.error("Fetch error:", err);
+      setApiErrorMessage("Failed to load leave reconciliation data.");
+      setApiErrorSnackbarOpen(true);
+      setLoading(false);
+    }
+  };
+
+  //Fetch Data
+  useEffect(() => {
+    if (!empID) {
+      setLoading(false);
+      return;
+    }
+
+    fetchData();
+  }, [empID]);
+
+  const [reasons, setReasons] = useState([]);
   const [enabledRows, setEnabledRows] = useState([]);
   const [appbarChecked, setAppbarChecked] = useState(false);
-  const [resetButtonsVisible, setResetButtonsVisible] = useState(
-    leaveDays.map(() => false)
-  );
+  const [resetButtonsVisible, setResetButtonsVisible] = useState([]);
   const [open, setOpen] = React.useState(false);
   const handleOpen = () => setOpen(true);
-  const handleClose = () => {
-    setReasons(leaveDays.map(() => ""));
-    setEnabledRows([]);
-    setAppbarChecked(false);
-    setResetButtonsVisible(leaveDays.map(() => false));
+
+  const resetHourStates = () => {
     setCodingValues(0);
     setTestingValues(0);
     setMeetingValues(0);
@@ -166,15 +202,33 @@ useEffect(() => {
     setMisValues(0);
     setDevopsValues(0);
     setTotalValues(0);
+    setTotal(0);
+    setFormData([]);
+  };
+
+  const handleClose = () => {
+    setReasons(leaveDays.map((r) => r.reason || ""));
+    setEnabledRows([]);
+    setAppbarChecked(false);
+    setResetButtonsVisible(leaveDays.map(() => false));
+    resetHourStates();
     setOpen(false);
   };
 
   const [emptyReasonSnackbarOpen, setEmptyReasonSnackbarOpen] = useState(false);
+  // const pendingRows = data.filter(row => row.status !== "Open");
 
   const handleResetButtonClick = (index) => () => {
     const updatedReasons = [...reasons];
     updatedReasons[index] = "";
     setReasons(updatedReasons);
+
+    const updatedLeaveDays = [...leaveDays];
+    if (updatedLeaveDays[index]) {
+      updatedLeaveDays[index].reason = "";
+    }
+    setLeaveDays(updatedLeaveDays);
+
     setResetButtonsVisible((prevResetButtonsVisible) => {
       const updatedButtonsVisible = [...prevResetButtonsVisible];
       updatedButtonsVisible[index] = false;
@@ -184,11 +238,23 @@ useEffect(() => {
 
   const handleAppbarCheckboxChange = (event) => {
     const isChecked = event.target.checked;
-    setAppbarChecked(isChecked);
+
     if (isChecked) {
-      setEnabledRows(Array.from(Array(leaveDays.length).keys()));
+      const firstOpenIndex = leaveDays.findIndex((row) => isOpenRow(row));
+
+      if (firstOpenIndex !== -1) {
+        setAppbarChecked(true);
+        setEnabledRows([firstOpenIndex]);
+        setReconciliationDate(leaveDays[firstOpenIndex].reconciliationDate);
+      } else {
+        setAppbarChecked(false);
+        setEnabledRows([]);
+        setReconciliationDate(null);
+      }
     } else {
+      setAppbarChecked(false);
       setEnabledRows([]);
+      setReconciliationDate(null);
     }
   };
 
@@ -197,21 +263,25 @@ useEffect(() => {
 
     if (isChecked) {
       setEnabledRows([index]);
-      const selectedReconciliationDate = leaveDays[index].reconciliation_date;
+      const selectedReconciliationDate = leaveDays[index].reconciliationDate;
       setReconciliationDate(selectedReconciliationDate);
+      setAppbarChecked(true);
     } else {
       setEnabledRows([]);
       setReconciliationDate(null);
+      setAppbarChecked(false);
     }
   };
 
-  const handleReasonChange = (index) => (event) => {
+  const handleReasonChange = (index, value) => {
     const updatedReasons = [...reasons];
-    updatedReasons[index] = event.target.value;
+    updatedReasons[index] = value;
     setReasons(updatedReasons);
+
     const updatedLeaveDays = [...leaveDays];
-    updatedLeaveDays[index].reason = event.target.value;
+    updatedLeaveDays[index].reason = value;
     setLeaveDays(updatedLeaveDays);
+
     setResetButtonsVisible((prevResetButtonsVisible) => {
       const updatedButtonsVisible = [...prevResetButtonsVisible];
       updatedButtonsVisible[index] = true;
@@ -219,79 +289,72 @@ useEffect(() => {
     });
   };
 
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: '90%',
-  maxWidth: 550,
-  bgcolor: "background.paper",
-  border: "2px solid #000",
-  boxShadow: 24,
-  p: 4,
-};
-
+  const style = {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+    width: "90%",
+    maxWidth: 550,
+    bgcolor: "background.paper",
+    border: "2px solid #000",
+    boxShadow: 24,
+    p: 4,
+  };
 
   if (!empID) {
-  console.error("empID is missing. Cannot proceed.");
-  return (
-    <Box p={4}>
-      <Typography variant="h6" color="error">
-        Error: Employee ID is missing.
-      </Typography>
-    </Box>
-  );
-}
+    console.error("empID is missing. Cannot proceed.");
+    return (
+      <Box p={4}>
+        <Typography variant="h6" color="error">
+          Error: Employee ID is missing.
+        </Typography>
+      </Box>
+    );
+  }
 
+  const isValidReason = (reason) => {
+    if (!reason) return false;
+
+    const trimmed = reason.trim();
+
+    if (trimmed.length < 5) return false;
+    if (!/[a-zA-Z]/.test(trimmed)) return false;
+
+    const invalidPatterns = [/^[^a-zA-Z0-9]+$/];
+
+    if (invalidPatterns.some((pattern) => pattern.test(trimmed))) {
+      return false;
+    }
+
+    return true;
+  };
 
   const handleSubmit = async () => {
-     if (!empID) {
-    console.error('Missing empID');
-    return;
-  }
-
-  // 2) ensure the user actually clicked a row checkbox
-  if (!reconciliationDate) {
-    setNoRowSelectedSnackbarOpen(true);
-    console.error('Please select a reconciliation row before submitting');
-    return;
-  }
-  
-    if (enabledRows.length === 0) {
-      setNoRowSelectedSnackbarOpen(true);
+    if (!empID) {
+      console.error("Missing empID");
       return;
     }
 
+    if (!reconciliationDate || enabledRows.length === 0) {
+      setNoRowSelectedSnackbarOpen(true);
+      console.error("Please select a reconciliation row before submitting");
+      return;
+    }
+
+    setResults([]);
     setLoading(true);
 
-    const hasEmptyReason = leaveDays.some(
-      (leaveDay, index) => enabledRows.includes(index) && !leaveDay.reason
+    const hasInvalidReason = leaveDays.some(
+      (leaveDay, index) =>
+        enabledRows.includes(index) && !isValidReason(leaveDay.reason)
     );
 
-    if (hasEmptyReason) {
+    if (hasInvalidReason) {
       setEmptyReasonSnackbarOpen(true);
       setLoading(false);
       return;
     }
-
-    // try {
-    //   const formattedDate = formatDate(reconciliationDate);
-    //   const url = `/ahWorkwave/totalEffort/employee/${empID}/effortDate/${formattedDate}`;
-    //   const response = await axios.get(url, {
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //     },
-    //   });
-
-    //   if (response.status === 200) {
-    //     const final = response.data;
-    //     setTotal(final);
-    //     console.log("Total Effort is:", total);
-    //   }
-    // } catch (error) {
-    //   console.error("Error fetching total effort:", error);
-    // }
 
     handleOpen(true);
     setLoading(false);
@@ -340,7 +403,13 @@ const style = {
       project_id: projectId,
       effort_task_description: getTaskDescription(taskId),
     };
-    setFormData((prevData) => [...prevData, newData]);
+
+    setFormData((prevData) => {
+      const filteredData = prevData.filter(
+        (item) => !(item.taskId === taskId && item.effortDate === convertedEffortDate)
+      );
+      return [...filteredData, newData];
+    });
   };
 
   const convertDateFormat = (oldFormat) => {
@@ -378,54 +447,135 @@ const style = {
     }
   };
 
-const handleSubmitModal = async () => {
+  const handleSubmitModal = async () => {
+  if (enabledRows.length === 0 || !reconciliationDate) {
+    setNoRowSelectedSnackbarOpen(true);
+    return;
+  }
+
+  const totalHours = Number(total || 0);
+
+  if (totalHours < 1) {
+    setOpenSnackbar(true);
+    return;
+  }
+
+  const selectedIndex = enabledRows[0];
+  const selectedRow = leaveDays[selectedIndex];
+
+  if (!selectedRow || !isValidReason(selectedRow.reason)) {
+    setEmptyReasonSnackbarOpen(true);
+    return;
+  }
+
   setLoading(true);
 
-const newEntries = enabledRows.map(index => ({
-    empID: '10022', // or use a unique taskId if needed
-    name: "Palak", // replace with actual name if available
-    reason: leaveDays[index].reason,
-    date: leaveDays[index].reconciliation_date,
-    status: "Pending"
-  }));
+  try {
+const rawDate = selectedRow.reconciliationDate || reconciliationDate;
 
-  // ✅ Save to localStorage
-  const existingData = JSON.parse(localStorage.getItem('reconciliationData')) || [];
-  const updatedData = [...existingData, ...newEntries];
-  localStorage.setItem('reconciliationData', JSON.stringify(updatedData));
-
-  // ✅ You can still log the output if needed
-  newEntries.forEach(entry => {
-    console.log("Simulated POST: ", entry);
-  });
-
-  const dataToSubmit = leaveDays.reduce((result, { reason }, index) => {
-    const oldReason = oldReasons[index];
-    if (reason !== oldReason) {
-      result[index] = reason;
-    }
-    return result;
-  }, {});
-  console.log("Simulated PUT: updateReasons", dataToSubmit);
-
-  handleClose();
-  setSuccessSnackbarOpen(true);
-  setLoading(false);
+// Ensure date is always yyyy-MM-dd before sending to backend
+const toApiDate = (d) => {
+  if (!d) return null;
+  // already yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // dd-mm-yy → yyyy-MM-dd
+  if (/^\d{2}-\d{2}-\d{2}$/.test(d)) {
+    const [dd, mm, yy] = d.split("-");
+    return `20${yy}-${mm}-${dd}`;
+  }
+  // dd-mm-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(d)) {
+    const [dd, mm, yyyy] = d.split("-");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return d;
 };
 
-
-  const handleCancel = () => {
-    const updatedReasons = leaveDays.map((day) => {
-      if (day.status == "Open") {
-        return "";
-      } else {
-        return day.reason;
-      }
+const apiDate = toApiDate(rawDate);
+console.log("DATE SENDING =>", apiDate);
+    const res = await fetch(`${API_BASE}/leavereconciliation/createLeaveReconciliation`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        employeeId: Number(empID),
+        employeeName:
+          employeeName || user?.employeeName || user?.name || user?.fullName || "",
+        name:
+          employeeName || user?.employeeName || user?.name || user?.fullName || "",
+        reason: selectedRow.reason,
+        reconciliationDate: apiDate,
+        status: "Pending",
+      }),
     });
-    setReasons(updatedReasons);
+
+    if (!res.ok) {
+      throw new Error("Failed to create leave reconciliation.");
+    }
+
+    await fetchData();
+
+    resetHourStates();
     setEnabledRows([]);
     setAppbarChecked(false);
-    setResetButtonsVisible(leaveDays.map(() => false));
+    setSuccessSnackbarOpen(true);
+    setOpen(false);
+
+    // IMPORTANT:
+    // Do not navigate to approval page.
+    // Employee should stay on Leave Reconciliation page and see Pending history.
+  } catch (error) {
+    console.error("Submit Error:", error);
+    setApiErrorMessage("Failed to submit leave reconciliation.");
+    setApiErrorSnackbarOpen(true);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const handleCancel = () => {
+  const clearedLeaveDays = leaveDays.map((row) => ({
+    ...row,
+    reason: isOpenRow(row) ? "" : row.reason,
+  }));
+
+  const clearedReasons = clearedLeaveDays.map((row) =>
+    isOpenRow(row) ? "" : row.reason || ""
+  );
+
+  setLeaveDays(clearedLeaveDays);
+  setReasons(clearedReasons);
+  setOldReasons(clearedReasons);
+  setEnabledRows([]);
+  setAppbarChecked(false);
+  setResetButtonsVisible(new Array(clearedLeaveDays.length).fill(false));
+  setReconciliationDate(null);
+  resetHourStates();
+  setOpen(false);
+};
+
+  const handleUpdateReason = async (index) => {
+    const row = leaveDays[index];
+
+    if (!row.reason) return;
+
+    try {
+      await fetch("http://localhost:8080/leavereconciliation/updateReasons", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          empID: empID,
+          reason: row.reason,
+        }),
+      });
+
+      console.log("Reason updated successfully");
+    } catch (error) {
+      console.error("Error updating reason:", error);
+    }
   };
 
   const theme = createTheme({
@@ -456,15 +606,51 @@ const newEntries = enabledRows.map(index => ({
   const handleIntegerChange = (value, setterFunction) => {
     if (value === "" || value === "\b") {
       setterFunction(0);
-      return;
+      return true;
     }
+
+    if (!/^\d+$/.test(String(value))) {
+      setOpenSnackbar(true);
+      return false;
+    }
+
     const intValue = parseInt(value, 10);
+
     if (!isNaN(intValue) && intValue <= MAX_VALUE) {
       const newValue = String(intValue).slice(0, 2);
       setterFunction(newValue);
+      return true;
     } else {
       setOpenSnackbar(true);
+      return false;
     }
+  };
+
+  const handleHoursFieldChange = (value, setterFunction) => {
+    if (value === "") {
+      setterFunction("");
+      setTimeout(() => {
+        handleInputChange();
+      }, 0);
+      return;
+    }
+
+    if (!/^\d+$/.test(value)) {
+      setOpenSnackbar(true);
+      return;
+    }
+
+    const intValue = parseInt(value, 10);
+
+    if (intValue > MAX_VALUE) {
+      setOpenSnackbar(true);
+      return;
+    }
+        
+    setterFunction(value);
+    setTimeout(() => {
+      handleInputChange();
+    }, 0);
   };
 
   const handleCloseSnackbar = () => {
@@ -472,21 +658,40 @@ const newEntries = enabledRows.map(index => ({
   };
 
   const handleCloseIcon = () => {
-    setReasons(leaveDays.map(() => ""));
+    setReasons(leaveDays.map((r) => r.reason || ""));
     setEnabledRows([]);
     setAppbarChecked(false);
     setResetButtonsVisible(leaveDays.map(() => false));
+    resetHourStates();
     setOpen(false);
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = String(date.getFullYear()).slice(-2);
-    return `${day}-${month}-${year}`;
-  };
+  if (!dateString) return "";
+
+  // already dd-mm-yy
+  if (/^\d{2}-\d{2}-\d{2}$/.test(dateString)) {
+    return dateString;
+  }
+
+  // yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [yyyy, mm, dd] = dateString.split("-");
+
+    return `${dd}-${mm}-${yyyy.slice(-2)}`;
+  }
+
+  // yyyy-mm-ddTHH:mm:ss
+  if (dateString.includes("T")) {
+    const onlyDate = dateString.split("T")[0];
+
+    const [yyyy, mm, dd] = onlyDate.split("-");
+
+    return `${dd}-${mm}-${yyyy.slice(-2)}`;
+  }
+
+  return dateString;
+};
 
   const handleEffort = (date, intValue, index) => {
     if (!results) {
@@ -548,171 +753,178 @@ const newEntries = enabledRows.map(index => ({
         main: "#585858",
       },
     },
-  }); 
+  });
 
   return (
     <ThemeProvider theme={theme}>
       {/* back arrow */}
-      <IconButton
-        onClick={() => navigate('/timesheettable')}
-        sx={{ position: 'absolute', top: 16, left: 16, color: 'white' }}
-      >
-        <ArrowBackIosIcon />
-      </IconButton>
+     <IconButton
+  onClick={() => navigate("/timesheettable")}
+  sx={{ color: "white" }}
+>  
+  <CloseIcon />
+</IconButton>
 
-      <Backdrop open={loading} style={{ zIndex: 999 }}></Backdrop>
+      <Backdrop open={loading} style={{ zIndex: 999, color: "#fff" }}>
+        <CircularProgress color="inherit" />
+      
+      </Backdrop>
+
       <Container maxWidth="md" sx={{ pt: 6 }}>
-  {loading && (
-    <Box
-      sx={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-      }}
-    >
-      <CircularProgress size={24} />
-    </Box>
-  )}
+        {loading && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <CircularProgress size={24} />
+          </Box>
+        )}
 
-  <Box
-    sx={{
-      border: "1px solid rgba(255,255,255,0.2)",
-      borderRadius: 2,
-      p: 2,
-      mb: 2,
-      bgcolor: "rgba(0,0,0,0.6)",
-      backdropFilter: "blur(6px)",
-      color: "white",
-    }}
-  >
-    {/* header bar */}
-    <Grid container alignItems="center" spacing={2}>
-      <Grid item xs={8}>
-        <Typography variant="h6">Leave Reconciliation</Typography>
-      </Grid>
-      <Grid item xs={4} textAlign="right">
-        <IconButton
-          component={Link}
-          to="/approvals/reconcilation"
-          sx={{ color: "white" }}
+        <Box
+          sx={{
+            border: "1px solid rgba(255,255,255,0.2)",
+            borderRadius: 2,
+            p: 2,
+            mb: 2,
+            bgcolor: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(6px)",
+            color: "white",
+          }}
         >
-          <CloseIcon />
-        </IconButton>
-      </Grid>
-    </Grid>
-
-    {/* styled table */}
-    <TableContainer
-      component={Paper}
-      elevation={0}
-      sx={{
-        bgcolor: "rgba(0,0,0,0.5)",
-        border: "1px solid rgba(255,255,255,0.2)",
-        borderRadius: 1,
-        maxHeight: "calc(100vh - 225px)",
-      }}
-    >
-      <Table
-        stickyHeader
-        size="small"
-        
-        sx={{
-          "& .MuiTableCell-stickyHeader": {
-      backgroundColor: "rgba(0, 0, 0, 0.8)",  // your translucent blue
-      color: "white",                            // keep the labels white
-      zIndex: 2, 
-      py:1.5,
-    },
-// zebra stripes & hover for the body
-      "& .MuiTableBody-root .MuiTableRow-root:nth-of-type(odd)": {
-        bgcolor: "rgba(255,255,255,0.05)",
-      },
-      "& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)": {
-        bgcolor: "rgba(255,255,255,0.10)",
-      },
-      "& .MuiTableBody-root .MuiTableRow-root:hover": {
-        bgcolor: "rgba(255,255,255,0.15)",
-      },
-      // lighten the cell text
-      "& .MuiTableBody-root .MuiTableCell-root": {
-        color: "rgba(255,255,255,0.9)",
-        borderBottom: "none",
-        py:-1,
-        px:2
-        
-      },
-      // narrow checkbox column
-      "& .MuiTableCell-paddingCheckbox": {
-        width: 48,
-      },
-        }}
-      >
-        <TableHead>
-          <TableRow>
-            <TableCell padding="checkbox">
-              <Checkbox
-                checked={enabledRows.length === leaveDays.length}
-                onChange={handleAppbarCheckboxChange}
+          {/* header bar */}
+          <Grid container alignItems="center" spacing={2}>
+            <Grid item xs={8}>
+              <Typography variant="h6">Leave Reconciliation</Typography>
+            </Grid>
+            <Grid item xs={4} textAlign="right">
+              <IconButton
+                component={Link}
+                to="/approvals/reconcilation"
                 sx={{ color: "white" }}
-              />
-            </TableCell>
-            <TableCell sx={{pl:2}}>Date</TableCell>
-            <TableCell  sx={{pl:2}}>Status</TableCell>
-            <TableCell sx={{ textAlign: "left" }}>Reason</TableCell>
-          </TableRow>
-        </TableHead>
+              >
+                <CloseIcon />
+              </IconButton>
+            </Grid>
+          </Grid>
 
-        <TableBody>
-          {leaveDays.map((leaveDay, index) => (
-            <TableRow key={leaveDay.reconciliation_date} hover>
-              <TableCell padding="checkbox">
-                <Checkbox
-                  checked={enabledRows.includes(index) || appbarChecked}
-                  onChange={handleCheckboxChange(index)}
-                  disabled={leaveDay.status !== "Open"}
-                  sx={{ color: "white" }}
-                />
-              </TableCell>
-              <TableCell align="left"  sx={{pl:2}}>
-                {leaveDay.reconciliation_date}
-              </TableCell>
-              <TableCell align="left" sx={{pl:2}}>{leaveDay.status}</TableCell>
-              <TableCell>
-                <TextField
-                  fullWidth
-                  size="small"
-                  variant="filled"
-                  placeholder="Reason"
-                  value={reasons[index] || ""}
-                  onChange={handleReasonChange(index)}
-                  disabled={
-                    !enabledRows.includes(index) || leaveDay.status !== "Open"
-                  }
-                  sx={{
-                    bgcolor: "rgba(255,255,255,0.1)",
-                    paddingTop:'2px',
-                    "& .MuiInputBase-input": { color: "white" },
-                  }}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          {/* styled table */}
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{
+              bgcolor: "rgba(0,0,0,0.5)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 1,
+              maxHeight: "calc(100vh - 225px)",
+            }}
+          >
+            <Table
+              stickyHeader
+              size="small"
+              sx={{
+                "& .MuiTableCell-stickyHeader": {
+                  backgroundColor: "rgba(0, 0, 0, 0.8)",
+                  color: "white",
+                  zIndex: 2,
+                  py: 1.5,
+                },
+                "& .MuiTableBody-root .MuiTableRow-root:nth-of-type(odd)": {
+                  bgcolor: "rgba(255,255,255,0.05)",
+                },
+                "& .MuiTableBody-root .MuiTableRow-root:nth-of-type(even)": {
+                  bgcolor: "rgba(255,255,255,0.10)",
+                },
+                "& .MuiTableBody-root .MuiTableRow-root:hover": {
+                  bgcolor: "rgba(255,255,255,0.15)",
+                },
+                "& .MuiTableBody-root .MuiTableCell-root": {
+                  color: "rgba(255,255,255,0.9)",
+                  borderBottom: "none",
+                  py: -1,
+                  px: 2,
+                },
+                "& .MuiTableCell-paddingCheckbox": {
+                  width: 48,
+                },
+              }}
+            >
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={appbarChecked}
+                      onChange={handleAppbarCheckboxChange}
+                      sx={{ color: "white" }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ pl: 2 }}>Date</TableCell>
+                  <TableCell sx={{ pl: 2 }}>Status</TableCell>
+                  <TableCell sx={{ textAlign: "left" }}>Reason</TableCell>
+                </TableRow>
+              </TableHead>
 
-    {/* button row with gap */}
-    <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 1 }}>
-      <Button variant="outlined" color="error" onClick={handleCancel}>
-        Clear
-      </Button>
-      <Button variant="contained" color="primary" onClick={handleSubmit}>
-        Submit
-      </Button>
-    </Stack>
-  </Box>
-</Container>
+              <TableBody>
+                {leaveDays.map((leaveDay, index) => (
+                  <TableRow
+                    key={leaveDay.leaveReconciliationId || leaveDay.reconciliationDate || index}
+                    hover
+                  >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={enabledRows.includes(index)}
+                        onChange={handleCheckboxChange(index)}
+                        disabled={leaveDay.status !== "Open"}
+                        sx={{ color: "white" }}
+                      />
+                    </TableCell>
+                    <TableCell align="left" sx={{ pl: 2 }}>
+                      {formatDate(leaveDay.reconciliationDate)}
+                    </TableCell>
+                    <TableCell align="left" sx={{ pl: 2 }}>
+                      {leaveDay.status}
+                    </TableCell>
+                    <TableCell>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        variant="filled"
+                        placeholder="Reason"
+                        value={
+                          leaveDay.status === "Open"
+                            ? reasons[index] || ""
+                            : leaveDay.reason || ""
+                        }
+                        onChange={(e) => handleReasonChange(index, e.target.value)}
+                        //onBlur={() => handleUpdateReason(index)}
+                        disabled={!enabledRows.includes(index) || leaveDay.status !== "Open"}
+                        sx={{
+                          bgcolor: "rgba(255,255,255,0.1)",
+                          paddingTop: "2px",
+                          "& .MuiInputBase-input": { color: "white" },
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* button row with gap */}
+          <Stack direction="row" spacing={2} justifyContent="flex-end" sx={{ mt: 1 }}>
+            <Button variant="outlined" color="error" onClick={handleCancel}>
+              Clear
+            </Button>
+            <Button variant="contained" color="primary" onClick={handleSubmit}>
+              Submit
+            </Button>
+          </Stack>
+        </Box>
+      </Container>
 
       <Modal
         open={open}
@@ -720,11 +932,10 @@ const newEntries = enabledRows.map(index => ({
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
         BackdropProps={{
-    style: {
-      backdropFilter: 'blur(4px)',
-      
-    }
-  }}
+          style: {
+            backdropFilter: "blur(4px)",
+          },
+        }}
       >
         <Box
           sx={style}
@@ -732,25 +943,29 @@ const newEntries = enabledRows.map(index => ({
             maxHeight: "calc(100vh - 75px)",
             padding: "8px",
             overflowY: "auto",
-                      
-            
           }}
         >
           <Table>
             <TableHead>
               <TableRow>
-   <TableCell colSpan={3} align="center" sx={{
-      py: 0.5,      // reduce vertical padding
-      fontSize: "13px",
-      fontWeight: 500,
-    }}>
-     <Typography>Date: {formatDate(reconciliationDate)}</Typography>
-   </TableCell>
- </TableRow>
-              <TableRow >
-                <TableHeaderCell sx={{bgcolor:'black'}}>Category</TableHeaderCell>
-                <TableHeaderCell sx={{bgcolor:'black'}}>Effort (in hours)</TableHeaderCell>
-                <TableHeaderCell sx={{bgcolor:'black'}}>
+                <TableCell
+                  colSpan={3}
+                  align="center"
+                  sx={{
+                    py: 0.5,
+                    fontSize: "13px",
+                    fontWeight: 500,
+                  }}
+                >
+                  <Typography>Date: {formatDate(reconciliationDate)}</Typography>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableHeaderCell sx={{ bgcolor: "black" }}>Category</TableHeaderCell>
+                <TableHeaderCell sx={{ bgcolor: "black" }}>
+                  Effort (in hours)
+                </TableHeaderCell>
+                <TableHeaderCell sx={{ bgcolor: "black" }}>
                   <CloseIcon onClick={handleCloseIcon} />
                 </TableHeaderCell>
               </TableRow>
@@ -760,14 +975,13 @@ const newEntries = enabledRows.map(index => ({
                 <TableRow className="customTableRow">
                   <TableCell
                     style={{
-                      backgroundColor: theme.palette.primary.main,
                       fontFamily: "Arial",
                       fontSize: "13px",
                       color: "white",
                       textAlign: "center",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      backgroundColor: "#676c71"
+                      backgroundColor: "#676c71",
                     }}
                   >
                     Coding
@@ -779,24 +993,20 @@ const newEntries = enabledRows.map(index => ({
                       textAlign: "center",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                     
                     }}
                   >
                     <TextField
                       type="text"
                       id="coding"
                       inputMode="numeric"
-                      defaultValue={
-                        handleEffort(formatDate(reconciliationDate), 1) ||
-                        codingValues
-                      }
-                      onChange={(e) => {
-                        setCodingValues(e.target.value);
-                        handleInputChange();
-                      }}
+                      value={codingValues}
+                      onChange={(e) => handleHoursFieldChange(e.target.value, setCodingValues)}
                       onKeyDown={(e) => {
                         if (e.key === "Backspace") {
                           handleIntegerChange("", setCodingValues);
+                          setTimeout(() => {
+                            handleInputChange();
+                          }, 0);
                         }
                       }}
                       onBlur={(event) => {
@@ -815,13 +1025,11 @@ const newEntries = enabledRows.map(index => ({
                           padding: "10px 0px",
                           fontSize: "13px",
                           height: "16px",
-                          backgroundColor:'#e8e9e7'
+                          backgroundColor: "#e8e9e7",
                         },
                       }}
                       onKeyPress={(event) => {
-                        const charCode = event.which
-                          ? event.which
-                          : event.keyCode;
+                        const charCode = event.which ? event.which : event.keyCode;
                         if (charCode > 31 && (charCode < 48 || charCode > 57)) {
                           event.preventDefault();
                         }
@@ -836,14 +1044,13 @@ const newEntries = enabledRows.map(index => ({
                 <TableRow className="customTableRow">
                   <TableCell
                     style={{
-                      backgroundColor: theme.palette.primary.main,
                       fontFamily: "Arial",
                       fontSize: "13px",
                       color: "white",
                       textAlign: "center",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      backgroundColor: "#676c71"
+                      backgroundColor: "#676c71",
                     }}
                   >
                     Testing
@@ -860,17 +1067,14 @@ const newEntries = enabledRows.map(index => ({
                     <TextField
                       type="text"
                       id="testing"
-                      defaultValue={
-                        handleEffort(formatDate(reconciliationDate), 2) ||
-                        testingValues
-                      }
-                      onChange={(e) => {
-                        setTestingValues(e.target.value);
-                        handleInputChange();
-                      }}
+                      value={testingValues}
+                      onChange={(e) => handleHoursFieldChange(e.target.value, setTestingValues)}
                       onKeyDown={(e) => {
                         if (e.key === "Backspace") {
                           handleIntegerChange("", setTestingValues);
+                          setTimeout(() => {
+                            handleInputChange();
+                          }, 0);
                         }
                       }}
                       onBlur={(event) => {
@@ -889,13 +1093,11 @@ const newEntries = enabledRows.map(index => ({
                           padding: "10px 0px",
                           fontSize: "13px",
                           height: "16px",
-                          backgroundColor:'#e8e9e7'
+                          backgroundColor: "#e8e9e7",
                         },
                       }}
                       onKeyPress={(event) => {
-                        const charCode = event.which
-                          ? event.which
-                          : event.keyCode;
+                        const charCode = event.which ? event.which : event.keyCode;
                         if (charCode > 31 && (charCode < 48 || charCode > 57)) {
                           event.preventDefault();
                         }
@@ -910,14 +1112,13 @@ const newEntries = enabledRows.map(index => ({
                 <TableRow className="customTableRow">
                   <TableCell
                     style={{
-                      backgroundColor: theme.palette.primary.main,
                       fontFamily: "Arial",
                       fontSize: "13px",
                       color: "white",
                       textAlign: "center",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      backgroundColor: "#676c71"
+                      backgroundColor: "#676c71",
                     }}
                   >
                     DevOps
@@ -934,17 +1135,14 @@ const newEntries = enabledRows.map(index => ({
                     <TextField
                       type="text"
                       id="devops"
-                      defaultValue={
-                        handleEffort(formatDate(reconciliationDate), 3) ||
-                        devopsValues
-                      }
-                      onChange={(e) => {
-                        setDevopsValues(e.target.value);
-                        handleInputChange();
-                      }}
+                      value={devopsValues}
+                      onChange={(e) => handleHoursFieldChange(e.target.value, setDevopsValues)}
                       onKeyDown={(e) => {
                         if (e.key === "Backspace") {
                           handleIntegerChange("", setDevopsValues);
+                          setTimeout(() => {
+                            handleInputChange();
+                          }, 0);
                         }
                       }}
                       onBlur={(event) => {
@@ -963,13 +1161,11 @@ const newEntries = enabledRows.map(index => ({
                           padding: "10px 0px",
                           fontSize: "13px",
                           height: "16px",
-                          backgroundColor:'#e8e9e7'
+                          backgroundColor: "#e8e9e7",
                         },
                       }}
                       onKeyPress={(event) => {
-                        const charCode = event.which
-                          ? event.which
-                          : event.keyCode;
+                        const charCode = event.which ? event.which : event.keyCode;
                         if (charCode > 31 && (charCode < 48 || charCode > 57)) {
                           event.preventDefault();
                         }
@@ -983,14 +1179,13 @@ const newEntries = enabledRows.map(index => ({
               <TableRow className="customTableRow">
                 <TableCell
                   style={{
-                    backgroundColor: theme.palette.primary.main,
                     fontFamily: "Arial",
                     fontSize: "13px",
                     color: "white",
                     textAlign: "center",
                     paddingTop: "1px",
                     paddingBottom: "1px",
-                    backgroundColor: "#676c71"
+                    backgroundColor: "#676c71",
                   }}
                 >
                   Meeting
@@ -1007,17 +1202,14 @@ const newEntries = enabledRows.map(index => ({
                   <TextField
                     type="text"
                     id="meeting"
-                    defaultValue={
-                      handleEffort(formatDate(reconciliationDate), 4) ||
-                      meetingValues
-                    }
-                    onChange={(e) => {
-                      setMeetingValues(e.target.value);
-                      handleInputChange();
-                    }}
+                    value={meetingValues}
+                    onChange={(e) => handleHoursFieldChange(e.target.value, setMeetingValues)}
                     onKeyDown={(e) => {
                       if (e.key === "Backspace") {
                         handleIntegerChange("", setMeetingValues);
+                        setTimeout(() => {
+                          handleInputChange();
+                        }, 0);
                       }
                     }}
                     onBlur={(event) => {
@@ -1036,13 +1228,11 @@ const newEntries = enabledRows.map(index => ({
                         padding: "10px 0px",
                         fontSize: "13px",
                         height: "16px",
-                        backgroundColor:'#e8e9e7'
+                        backgroundColor: "#e8e9e7",
                       },
                     }}
                     onKeyPress={(event) => {
-                      const charCode = event.which
-                        ? event.which
-                        : event.keyCode;
+                      const charCode = event.which ? event.which : event.keyCode;
                       if (charCode > 31 && (charCode < 48 || charCode > 57)) {
                         event.preventDefault();
                       }
@@ -1056,14 +1246,13 @@ const newEntries = enabledRows.map(index => ({
                 <TableRow className="customTableRow">
                   <TableCell
                     style={{
-                      backgroundColor: theme.palette.primary.main,
                       fontFamily: "Arial",
                       fontSize: "13px",
                       color: "white",
                       textAlign: "center",
                       paddingTop: "1px",
                       paddingBottom: "1px",
-                      backgroundColor: "#676c71"
+                      backgroundColor: "#676c71",
                     }}
                   >
                     Database
@@ -1080,17 +1269,14 @@ const newEntries = enabledRows.map(index => ({
                     <TextField
                       type="text"
                       id="data"
-                      defaultValue={
-                        handleEffort(formatDate(reconciliationDate), 5) ||
-                        dataValues
-                      }
-                      onChange={(e) => {
-                        setDataValues(e.target.value);
-                        handleInputChange();
-                      }}
+                      value={dataValues}
+                      onChange={(e) => handleHoursFieldChange(e.target.value, setDataValues)}
                       onKeyDown={(e) => {
                         if (e.key === "Backspace") {
                           handleIntegerChange("", setDataValues);
+                          setTimeout(() => {
+                            handleInputChange();
+                          }, 0);
                         }
                       }}
                       onBlur={(event) => {
@@ -1109,13 +1295,11 @@ const newEntries = enabledRows.map(index => ({
                           padding: "10px 0px",
                           fontSize: "13px",
                           height: "16px",
-                          backgroundColor:'#e8e9e7'
+                          backgroundColor: "#e8e9e7",
                         },
                       }}
                       onKeyPress={(event) => {
-                        const charCode = event.which
-                          ? event.which
-                          : event.keyCode;
+                        const charCode = event.which ? event.which : event.keyCode;
                         if (charCode > 31 && (charCode < 48 || charCode > 57)) {
                           event.preventDefault();
                         }
@@ -1140,14 +1324,13 @@ const newEntries = enabledRows.map(index => ({
                   <TableRow className="customTableRow">
                     <TableCell
                       style={{
-                        backgroundColor: theme.palette.primary.main,
                         fontFamily: "Arial",
                         fontSize: "13px",
                         color: "white",
                         textAlign: "center",
                         paddingTop: "1px",
                         paddingBottom: "1px",
-                        backgroundColor: "#676c71"
+                        backgroundColor: "#676c71",
                       }}
                     >
                       Talent Acquisition
@@ -1164,17 +1347,14 @@ const newEntries = enabledRows.map(index => ({
                       <TextField
                         type="text"
                         id="ta"
-                        defaultValue={
-                          handleEffort(formatDate(reconciliationDate), 6) ||
-                          taValues
-                        }
-                        onChange={(e) => {
-                          setTaValues(e.target.value);
-                          handleInputChange();
-                        }}
+                        value={taValues}
+                        onChange={(e) => handleHoursFieldChange(e.target.value, setTaValues)}
                         onKeyDown={(e) => {
                           if (e.key === "Backspace") {
                             handleIntegerChange("", setTaValues);
+                            setTimeout(() => {
+                              handleInputChange();
+                            }, 0);
                           }
                         }}
                         onBlur={(event) => {
@@ -1193,14 +1373,11 @@ const newEntries = enabledRows.map(index => ({
                             padding: "10px 0px",
                             fontSize: "13px",
                             height: "16px",
-                            backgroundColor: '#e8e9e7'
-
+                            backgroundColor: "#e8e9e7",
                           },
                         }}
                         onKeyPress={(event) => {
-                          const charCode = event.which
-                            ? event.which
-                            : event.keyCode;
+                          const charCode = event.which ? event.which : event.keyCode;
                           if (
                             charCode > 31 &&
                             (charCode < 48 || charCode > 57)
@@ -1228,14 +1405,13 @@ const newEntries = enabledRows.map(index => ({
                   <TableRow className="customTableRow">
                     <TableCell
                       style={{
-                        backgroundColor: theme.palette.primary.main,
                         fontFamily: "Arial",
                         fontSize: "13px",
                         color: "white",
                         textAlign: "center",
                         paddingTop: "1px",
                         paddingBottom: "1px",
-                        backgroundColor: "#676c71"
+                        backgroundColor: "#676c71",
                       }}
                     >
                       Training and Development
@@ -1252,17 +1428,14 @@ const newEntries = enabledRows.map(index => ({
                       <TextField
                         type="text"
                         id="td"
-                        defaultValue={
-                          handleEffort(formatDate(reconciliationDate), 8) ||
-                          tdValues
-                        }
-                        onChange={(e) => {
-                          setTdValues(e.target.value);
-                          handleInputChange();
-                        }}
+                        value={tdValues}
+                        onChange={(e) => handleHoursFieldChange(e.target.value, setTdValues)}
                         onKeyDown={(e) => {
                           if (e.key === "Backspace") {
                             handleIntegerChange("", setTdValues);
+                            setTimeout(() => {
+                              handleInputChange();
+                            }, 0);
                           }
                         }}
                         onBlur={(event) => {
@@ -1281,13 +1454,11 @@ const newEntries = enabledRows.map(index => ({
                             padding: "10px 0px",
                             fontSize: "13px",
                             height: "16px",
-                            backgroundColor:'#e8e9e7'
+                            backgroundColor: "#e8e9e7",
                           },
                         }}
                         onKeyPress={(event) => {
-                          const charCode = event.which
-                            ? event.which
-                            : event.keyCode;
+                          const charCode = event.which ? event.which : event.keyCode;
                           if (
                             charCode > 31 &&
                             (charCode < 48 || charCode > 57)
@@ -1315,14 +1486,13 @@ const newEntries = enabledRows.map(index => ({
                   <TableRow className="customTableRow">
                     <TableCell
                       style={{
-                        backgroundColor: theme.palette.primary.main,
                         fontFamily: "Arial",
                         fontSize: "13px",
                         color: "white",
                         textAlign: "center",
                         paddingTop: "1px",
                         paddingBottom: "1px",
-                        backgroundColor: "#676c71"
+                        backgroundColor: "#676c71",
                       }}
                     >
                       Employee Engagement
@@ -1339,21 +1509,18 @@ const newEntries = enabledRows.map(index => ({
                       <TextField
                         type="text"
                         id="ee"
-                        defaultValue={
-                          handleEffort(formatDate(reconciliationDate), 9) ||
-                          eeValues
-                        }
-                        onChange={(e) => {
-                          setEeValues(e.target.value);
-                          handleInputChange();
-                        }}
+                        value={eeValues}
+                        onChange={(e) => handleHoursFieldChange(e.target.value, setEeValues)}
                         onKeyDown={(e) => {
                           if (e.key === "Backspace") {
                             handleIntegerChange("", setEeValues);
+                            setTimeout(() => {
+                              handleInputChange();
+                            }, 0);
                           }
                         }}
                         onBlur={(event) => {
-                          setTaskId(6);
+                          setTaskId(9);
                           handleBlurEvent(
                             9,
                             formatDate(reconciliationDate),
@@ -1368,13 +1535,11 @@ const newEntries = enabledRows.map(index => ({
                             padding: "10px 0px",
                             fontSize: "13px",
                             height: "16px",
-                            backgroundColor:'#e8e9e7'
+                            backgroundColor: "#e8e9e7",
                           },
                         }}
                         onKeyPress={(event) => {
-                          const charCode = event.which
-                            ? event.which
-                            : event.keyCode;
+                          const charCode = event.which ? event.which : event.keyCode;
                           if (
                             charCode > 31 &&
                             (charCode < 48 || charCode > 57)
@@ -1402,14 +1567,13 @@ const newEntries = enabledRows.map(index => ({
                   <TableRow className="customTableRow">
                     <TableCell
                       style={{
-                        backgroundColor: theme.palette.primary.main,
                         fontFamily: "Arial",
                         fontSize: "13px",
                         color: "white",
                         textAlign: "center",
                         paddingTop: "1px",
                         paddingBottom: "1px",
-                        backgroundColor: "#676c71"
+                        backgroundColor: "#676c71",
                       }}
                     >
                       Performance Management
@@ -1426,17 +1590,14 @@ const newEntries = enabledRows.map(index => ({
                       <TextField
                         type="text"
                         id="pm"
-                        defaultValue={
-                          handleEffort(formatDate(reconciliationDate), 10) ||
-                          pmValues
-                        }
-                        onChange={(e) => {
-                          setPmValues(e.target.value);
-                          handleInputChange();
-                        }}
+                        value={pmValues}
+                        onChange={(e) => handleHoursFieldChange(e.target.value, setPmValues)}
                         onKeyDown={(e) => {
                           if (e.key === "Backspace") {
                             handleIntegerChange("", setPmValues);
+                            setTimeout(() => {
+                              handleInputChange();
+                            }, 0);
                           }
                         }}
                         onBlur={(event) => {
@@ -1455,13 +1616,11 @@ const newEntries = enabledRows.map(index => ({
                             padding: "10px 0px",
                             fontSize: "13px",
                             height: "16px",
-                            backgroundColor:'#e8e9e7'
+                            backgroundColor: "#e8e9e7",
                           },
                         }}
                         onKeyPress={(event) => {
-                          const charCode = event.which
-                            ? event.which
-                            : event.keyCode;
+                          const charCode = event.which ? event.which : event.keyCode;
                           if (
                             charCode > 31 &&
                             (charCode < 48 || charCode > 57)
@@ -1489,14 +1648,13 @@ const newEntries = enabledRows.map(index => ({
                   <TableRow className="customTableRow">
                     <TableCell
                       style={{
-                        backgroundColor: theme.palette.primary.main,
                         fontFamily: "Arial",
                         fontSize: "13px",
                         color: "white",
                         textAlign: "center",
                         paddingTop: "1px",
                         paddingBottom: "1px",
-                        backgroundColor: "#676c71"
+                        backgroundColor: "#676c71",
                       }}
                     >
                       Compensation and Benefits
@@ -1513,17 +1671,14 @@ const newEntries = enabledRows.map(index => ({
                       <TextField
                         type="text"
                         id="cb"
-                        defaultValue={
-                          handleEffort(formatDate(reconciliationDate), 11) ||
-                          cbValues
-                        }
-                        onChange={(e) => {
-                          setCbValues(e.target.value);
-                          handleInputChange();
-                        }}
+                        value={cbValues}
+                        onChange={(e) => handleHoursFieldChange(e.target.value, setCbValues)}
                         onKeyDown={(e) => {
                           if (e.key === "Backspace") {
                             handleIntegerChange("", setCbValues);
+                            setTimeout(() => {
+                              handleInputChange();
+                            }, 0);
                           }
                         }}
                         onBlur={(event) => {
@@ -1542,13 +1697,11 @@ const newEntries = enabledRows.map(index => ({
                             padding: "10px 0px",
                             fontSize: "13px",
                             height: "16px",
-                            backgroundColor:'#e8e9e7'
+                            backgroundColor: "#e8e9e7",
                           },
                         }}
                         onKeyPress={(event) => {
-                          const charCode = event.which
-                            ? event.which
-                            : event.keyCode;
+                          const charCode = event.which ? event.which : event.keyCode;
                           if (
                             charCode > 31 &&
                             (charCode < 48 || charCode > 57)
@@ -1561,6 +1714,7 @@ const newEntries = enabledRows.map(index => ({
                     </TableCell>
                   </TableRow>
                 )}
+
               {projectId !== Taskname.ahWorkwaveProjectId &&
                 projectId !== Taskname.aomaDeliveryProjectId &&
                 projectId !== Taskname.aomaPromoProjectId &&
@@ -1575,14 +1729,13 @@ const newEntries = enabledRows.map(index => ({
                   <TableRow className="customTableRow">
                     <TableCell
                       style={{
-                        backgroundColor: theme.palette.primary.main,
                         fontFamily: "Arial",
                         fontSize: "13px",
                         color: "white",
                         textAlign: "center",
                         paddingTop: "1px",
                         paddingBottom: "1px",
-                        backgroundColor: "#676c71"
+                        backgroundColor: "#676c71",
                       }}
                     >
                       Audits and Compilance
@@ -1599,17 +1752,14 @@ const newEntries = enabledRows.map(index => ({
                       <TextField
                         type="text"
                         id="ac"
-                        defaultValue={
-                          handleEffort(formatDate(reconciliationDate), 12) ||
-                          acValues
-                        }
-                        onChange={(e) => {
-                          setAcValues(e.target.value);
-                          handleInputChange();
-                        }}
+                        value={acValues}
+                        onChange={(e) => handleHoursFieldChange(e.target.value, setAcValues)}
                         onKeyDown={(e) => {
                           if (e.key === "Backspace") {
                             handleIntegerChange("", setAcValues);
+                            setTimeout(() => {
+                              handleInputChange();
+                            }, 0);
                           }
                         }}
                         onBlur={(event) => {
@@ -1628,13 +1778,11 @@ const newEntries = enabledRows.map(index => ({
                             padding: "10px 0px",
                             fontSize: "13px",
                             height: "16px",
-                            backgroundColor:'#e8e9e7'
+                            backgroundColor: "#e8e9e7",
                           },
                         }}
                         onKeyPress={(event) => {
-                          const charCode = event.which
-                            ? event.which
-                            : event.keyCode;
+                          const charCode = event.which ? event.which : event.keyCode;
                           if (
                             charCode > 31 &&
                             (charCode < 48 || charCode > 57)
@@ -1651,14 +1799,13 @@ const newEntries = enabledRows.map(index => ({
               <TableRow className="customTableRow">
                 <TableCell
                   style={{
-                    backgroundColor: theme.palette.primary.main,
                     fontFamily: "Arial",
                     fontSize: "13px",
                     color: "white",
                     textAlign: "center",
                     paddingTop: "1px",
                     paddingBottom: "1px",
-                    backgroundColor: "#676c71"
+                    backgroundColor: "#676c71",
                   }}
                 >
                   Miscellaneous
@@ -1675,17 +1822,14 @@ const newEntries = enabledRows.map(index => ({
                   <TextField
                     type="text"
                     id="mis"
-                    defaultValue={
-                      handleEffort(formatDate(reconciliationDate), 7) ||
-                      misValues
-                    }
-                    onChange={(e) => {
-                      setMisValues(e.target.value);
-                      handleInputChange();
-                    }}
+                    value={misValues}
+                    onChange={(e) => handleHoursFieldChange(e.target.value, setMisValues)}
                     onKeyDown={(e) => {
                       if (e.key === "Backspace") {
                         handleIntegerChange("", setMisValues);
+                        setTimeout(() => {
+                          handleInputChange();
+                        }, 0);
                       }
                     }}
                     onBlur={(event) => {
@@ -1704,13 +1848,11 @@ const newEntries = enabledRows.map(index => ({
                         padding: "10px 0px",
                         fontSize: "13px",
                         height: "16px",
-                        backgroundColor:'#e8e9e7'
+                        backgroundColor: "#e8e9e7",
                       },
                     }}
                     onKeyPress={(event) => {
-                      const charCode = event.which
-                        ? event.which
-                        : event.keyCode;
+                      const charCode = event.which ? event.which : event.keyCode;
                       if (charCode > 31 && (charCode < 48 || charCode > 57)) {
                         event.preventDefault();
                       }
@@ -1723,14 +1865,13 @@ const newEntries = enabledRows.map(index => ({
               <TableRow>
                 <TableCell
                   style={{
-                   backgroundColor: "#353638",
+                    backgroundColor: "#353638",
                     fontFamily: "Arial",
                     fontSize: "13px",
                     color: "white",
                     textAlign: "center",
                     paddingTop: "1px",
                     paddingBottom: "1px",
-
                   }}
                 >
                   Total
@@ -1742,12 +1883,11 @@ const newEntries = enabledRows.map(index => ({
                     textAlign: "center",
                     paddingTop: "1px",
                     paddingBottom: "1px",
-
                   }}
                 >
                   <TextField
                     type="text"
-                    id="mis"
+                    id="totalHours"
                     value={total}
                     readOnly
                     inputProps={{
@@ -1756,7 +1896,7 @@ const newEntries = enabledRows.map(index => ({
                         padding: "10px 0px",
                         fontSize: "13px",
                         height: "16px",
-                        backgroundColor:'#cccccc'
+                        backgroundColor: "#cccccc",
                       },
                     }}
                     className="customTextField"
@@ -1766,18 +1906,21 @@ const newEntries = enabledRows.map(index => ({
             </TableBody>
           </Table>
 
-          <Box className="buttonContainer"   sx={{ mt: 1, display: "flex", justifyContent: "center" }} >
+          <Box
+            className="buttonContainer"
+            sx={{ mt: 1, display: "flex", justifyContent: "center" }}
+          >
             <Button
               variant="contained"
               color="primary"
               className="customButton"
               onClick={handleSubmitModal}
               style={{
-      width: "30%",
-      height: "36px",
-      fontSize: "13px",
-      boxShadow: "2px 2px 4px rgba(0, 0, 0, 0.85)",
-    }}
+                width: "30%",
+                height: "36px",
+                fontSize: "13px",
+                boxShadow: "2px 2px 4px rgba(0, 0, 0, 0.85)",
+              }}
               disabled={loading}
             >
               Submit
@@ -1795,7 +1938,7 @@ const newEntries = enabledRows.map(index => ({
                 fontSize: '11px',
                 boxShadow: '2px 2px 4px rgba(0, 0, 0, 0.85)',
               }}
-              disabled={loading} 
+              disabled={loading}
             >
               Clear
             </Button> } */}
@@ -1809,14 +1952,11 @@ const newEntries = enabledRows.map(index => ({
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity="error"
-          sx={{ width: "100%" }}
-        >
-          Value cannot be greater than 24
+        <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: "100%" }}>
+          Please enter valid reason and at least 1 hour of work
         </Alert>
       </Snackbar>
+
       <Snackbar
         open={successSnackbarOpen}
         autoHideDuration={3000}
@@ -1840,17 +1980,37 @@ const newEntries = enabledRows.map(index => ({
           Details submitted successfully!
         </MuiAlert>
       </Snackbar>
+
       <Snackbar
         open={emptyReasonSnackbarOpen}
         autoHideDuration={6000}
         onClose={() => setEmptyReasonSnackbarOpen(false)}
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert
-          severity="error"
-          onClose={() => setEmptyReasonSnackbarOpen(false)}
-        >
-          Please provide the reason
+        <Alert severity="error" onClose={() => setEmptyReasonSnackbarOpen(false)}>
+          Please provide a valid reason
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={noRowSelectedSnackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setNoRowSelectedSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity="error" onClose={() => setNoRowSelectedSnackbarOpen(false)}>
+          Please select one open reconciliation row
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={apiErrorSnackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setApiErrorSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <Alert severity="error" onClose={() => setApiErrorSnackbarOpen(false)}>
+          {apiErrorMessage}
         </Alert>
       </Snackbar>
     </ThemeProvider>

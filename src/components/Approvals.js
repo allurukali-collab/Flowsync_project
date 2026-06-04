@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -16,121 +16,208 @@ import {
   Checkbox,
   Paper,
   TablePagination,
-  Snackbar,    // ← add this
-  Alert  
+  Snackbar,
+  Alert
 } from '@mui/material'
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos'
 import SearchIcon from '@mui/icons-material/Search'
 import RejectButton from './RejectButton'
 
-// initial ACTIVE rows
-const activeSampleRows = [
-  { id: 1150, name: 'Dhanush',  leaveType: 'Annual Leave', startDate: '09-06-2025', endDate: '09-06-2025', days: 1, reason: '', appliedOn: '30-05-2025', status: 'Withdraw Pending' },
-  { id: 1151, name: 'Divesh',   leaveType: 'Annual Leave', startDate: '09-06-2025', endDate: '09-06-2025', days: 1, reason: '', appliedOn: '30-05-2025', status: 'Withdraw Pending' },
-  { id: 1152, name: 'Dakshesh', leaveType: 'Annual Leave', startDate: '09-06-2025', endDate: '09-06-2025', days: 1, reason: '', appliedOn: '30-05-2025', status: 'Withdraw Pending' },
-  {id: 1246, name: 'Palak P',  leaveType: 'Annual Leave', startDate: '21-10-2024', endDate: '21-10-2024', days: 1, reason: 'Personal', appliedOn: '21-05-2025', status: 'withdraw pending' }
-]
-
 export default function Approvals() {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  // state
-const [activeTab, setActiveTab]         = useState('ACTIVE')
-const [activeRows, setActiveRows] = useState(() => {
-  const stored = localStorage.getItem("leaveApprovals");
-  return stored ? JSON.parse(stored) : [];
-});
-const [selected, setSelected]   = useState([])
-  const [page, setPage]                 = useState(0)
 
-  const [rowsPerPage, setRowsPerPage]   = useState(5)
-  // ← NEW: snackbar open state
+  const leaveApprovalsKey = "leaveApprovals"
+  const closedRowsKey = "closedRows"
+  const commonLeaveHistoryKey = "leaveHistory"
+
+  const [activeTab, setActiveTab] = useState('ACTIVE')
+  const [activeRows, setActiveRows] = useState(() => {
+    const stored = localStorage.getItem(leaveApprovalsKey)
+    return stored ? JSON.parse(stored) : []
+  })
+  const [selected, setSelected] = useState([])
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(5)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
-// NEW: state for the Reject modal
- const [openReject, setOpenReject] = useState(false)
- const [toRejectRows, setToRejectRows] = useState([])
+  const [rejectSnackbarOpen, setRejectSnackbarOpen] = useState(false)
 
-  // toggle a single row’s checkbox
-  function handleSelect(id){
+  const [openReject, setOpenReject] = useState(false)
+  const [toRejectRows, setToRejectRows] = useState([])
+
+  useEffect(() => {
+    const stored = localStorage.getItem(leaveApprovalsKey)
+    setActiveRows(stored ? JSON.parse(stored) : [])
+  }, [])
+
+  function handleSelect(id) {
     setSelected(prev =>
-    prev.includes(id)
-      ? prev.filter(rid => rid !== id)
-      : [...prev, id]
-  )
-}
-  // APPROVE logic
-const handleApprove = () => {
-  if (!selected.length) return;
+      prev.includes(id)
+        ? prev.filter(rid => rid !== id)
+        : [...prev, id]
+    )
+  }
 
-  // 1) Build the newly‐approved items with updated balances
-  const approvedItems = activeRows
-    .filter(r => selected.includes(r.id))
-    .map(r => ({
-      ...r,
-      status:  'Approved',
-      reason:  r.reason || 'SickLeave',
-      balance: r.balance
-    }));
+  const upsertCommonHistory = (items, statusToSet) => {
+    const commonHistory = JSON.parse(localStorage.getItem(commonLeaveHistoryKey) || "[]")
 
- const updatedActiveRows = activeRows.filter(r => !selected.includes(r.id));
-setActiveRows(updatedActiveRows);
-localStorage.setItem("leaveApprovals", JSON.stringify(updatedActiveRows));
+    const updatedCommonHistory = [...commonHistory]
 
-    const existing = JSON.parse(localStorage.getItem('closedRows')||'[]')
-    localStorage.setItem('closedRows', JSON.stringify([...existing, ...approvedItems]))
+    items.forEach(item => {
+      const idx = updatedCommonHistory.findIndex(entry => entry.id === item.id)
 
-    const history = JSON.parse(localStorage.getItem("leaveHistory") || "[]");
-     const updatedHistory = history.map(entry =>
-      selected.includes(entry.id) ? { ...entry, status: "Approved", balance: entry.balance } : entry
-    );
-    localStorage.setItem("leaveHistory", JSON.stringify(updatedHistory));
+      const normalizedItem = {
+        ...item,
+        empId: item.empId || item.empID || "",
+        leaveType: item.leaveType || "Leave",
+        startDate: item.startDate || item.date || "",
+        endDate: item.endDate || item.date || "",
+        days: item.days || 1,
+        appliedOn: item.appliedOn || new Date().toLocaleDateString("en-GB").replace(/\//g, "-"),
+        reason: item.reason || "",
+        balance: item.balance ?? "-",
+        status: statusToSet,
+        category:
+          item.category ||
+          (item.leaveType === "Leave Reconciliation" || item.leaveType === "Reconciliation"
+            ? "Reconciliation"
+            : "Normal Leave"),
+      }
+
+      if (idx !== -1) {
+        updatedCommonHistory[idx] = {
+          ...updatedCommonHistory[idx],
+          ...normalizedItem,
+          status: statusToSet,
+        }
+      } else {
+        updatedCommonHistory.push(normalizedItem)
+      }
+    })
+
+    localStorage.setItem(commonLeaveHistoryKey, JSON.stringify(updatedCommonHistory))
+  }
+
+  const handleApprove = () => {
+    if (!selected.length) return
+
+    const approvedItems = activeRows
+      .filter(r => selected.includes(r.id))
+      .map(r => ({
+        ...r,
+        status: 'Approved',
+        reason: r.reason || 'SickLeave',
+        balance: r.balance,
+        category:
+          r.category ||
+          (r.leaveType === "Leave Reconciliation" || r.leaveType === "Reconciliation"
+            ? "Reconciliation"
+            : "Normal Leave"),
+      }))
+
+    const updatedActiveRows = activeRows.filter(r => !selected.includes(r.id))
+    setActiveRows(updatedActiveRows)
+    localStorage.setItem(leaveApprovalsKey, JSON.stringify(updatedActiveRows))
+
+    const existing = JSON.parse(localStorage.getItem(closedRowsKey) || '[]')
+
+    const mergedClosed = [...existing]
+    approvedItems.forEach(item => {
+      const existingIndex = mergedClosed.findIndex(row => row.id === item.id)
+      if (existingIndex !== -1) {
+        mergedClosed[existingIndex] = item
+      } else {
+        mergedClosed.push(item)
+      }
+    })
+
+    localStorage.setItem(closedRowsKey, JSON.stringify(mergedClosed))
+
+    approvedItems.forEach(item => {
+      const employeeKey = `leaveHistory_${item.empId}`
+      const employeeHistory = JSON.parse(localStorage.getItem(employeeKey) || "[]")
+      const updatedHistory = employeeHistory.map(entry =>
+        entry.id === item.id
+          ? { ...entry, status: "Approved", balance: entry.balance }
+          : entry
+      )
+      localStorage.setItem(employeeKey, JSON.stringify(updatedHistory))
+    })
+
+    upsertCommonHistory(approvedItems, "Approved")
 
     setSelected([])
     setActiveTab('CLOSED')
-
-    // ← NEW: fire success toast
     setSnackbarOpen(true)
   }
 
-  // REJECT logic (no-op here)
-const handleOpenReject = () => {
-  // grab the full row objects for any selected IDs
-  setToRejectRows(
-    filteredRows.filter(r => selected.includes(r.id))
-  )
-  setOpenReject(true)
+  const handleOpenReject = () => {
+    setToRejectRows(
+      filteredRows.filter(r => selected.includes(r.id))
+    )
+    setOpenReject(true)
   }
 
- const handleCloseReject = () => setOpenReject(false)
+  const handleCloseReject = () => setOpenReject(false)
 
-  // this will be called when RejectButton finishes
   const onRowsRejected = (rejectedItems) => {
-    // remove them from activeRows
-    const updatedActive = activeRows.filter(r => !rejectedItems.some(x => x.id === r.id));
-setActiveRows(updatedActive);
-localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
+    const updatedActive = activeRows.filter(r => !rejectedItems.some(x => x.id === r.id))
+    setActiveRows(updatedActive)
+    localStorage.setItem(leaveApprovalsKey, JSON.stringify(updatedActive))
     setSelected([])
-    // optionally switch to CLOSED tab:
-    //setActiveTab('CLOSED')
-     const updatedHistory = JSON.parse(localStorage.getItem("leaveHistory") || "[]").map(entry =>
-      rejectedItems.some(item => item.id === entry.empId) ? { ...entry, status: "Rejected" } : entry
-       );
-    localStorage.setItem("leaveHistory", JSON.stringify(updatedHistory));
 
-    setActiveTab('CLOSED');
+    const existingClosed = JSON.parse(localStorage.getItem(closedRowsKey) || '[]')
+    const rejectedClosedItems = rejectedItems.map(item => ({
+      ...item,
+      status: "Rejected",
+      category:
+        item.category ||
+        (item.leaveType === "Leave Reconciliation" || item.leaveType === "Reconciliation"
+          ? "Reconciliation"
+          : "Normal Leave"),
+    }))
+
+    const mergedClosed = [...existingClosed]
+    rejectedClosedItems.forEach(item => {
+      const existingIndex = mergedClosed.findIndex(row => row.id === item.id)
+      if (existingIndex !== -1) {
+        mergedClosed[existingIndex] = item
+      } else {
+        mergedClosed.push(item)
+      }
+    })
+
+    localStorage.setItem(closedRowsKey, JSON.stringify(mergedClosed))
+
+    rejectedItems.forEach(item => {
+      const employeeKey = `leaveHistory_${item.empId}`
+      const employeeHistory = JSON.parse(localStorage.getItem(employeeKey) || "[]")
+      const updatedHistory = employeeHistory.map(entry =>
+        entry.id === item.id
+          ? { ...entry, status: "Rejected" }
+          : entry
+      )
+      localStorage.setItem(employeeKey, JSON.stringify(updatedHistory))
+    })
+
+    upsertCommonHistory(rejectedClosedItems, "Rejected")
+
+    setActiveTab('CLOSED')
+    setRejectSnackbarOpen(true)
   }
 
   const filteredRows = activeRows.filter(r => {
-  const term = searchTerm.trim().toLowerCase()
-  if (!term) return true
-  return (
-    r.id.toString().includes(term) ||
-    r.name.toLowerCase().includes(term)
-  )
-})
- // header checkbox state (based on filteredRows)
- const allSelected  = selected.length === filteredRows.length && filteredRows.length > 0
- const someSelected = selected.length > 0 && selected.length < filteredRows.length
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return true
+    return (
+      (r.empId && r.empId.toString().includes(term)) ||
+      (r.name && r.name.toLowerCase().includes(term)) ||
+      (r.id && r.id.toString().includes(term))
+    )
+  })
+
+  const allSelected = filteredRows.length > 0 && filteredRows.every(row => selected.includes(row.id))
+  const someSelected = filteredRows.some(row => selected.includes(row.id)) && !allSelected
 
   return (
     <div style={{
@@ -140,7 +227,6 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
       fontFamily: 'Arial',
       paddingTop: 16
     }}>
-      {/* back arrow */}
       <IconButton
         onClick={() => navigate('/timesheettable')}
         sx={{ position: 'absolute', top: 16, left: 16, color: 'white' }}
@@ -150,18 +236,16 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
 
       <h2 style={{ margin: 0 }}>Leave Approval / Reconciliation</h2>
 
-      {/* outer box */}
       <Box sx={{
         mt: 3,
         width: '90%',
         maxWidth: 1450,
-        mx:'auto',
+        mx: 'auto',
         border: '2px solid rgba(45, 44, 44, 0.26)',
         borderRadius: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.59)',
         p: 2,
       }}>
-        {/* Tabs */}
         <Stack direction="row" spacing={1} sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
           <Button
             variant="contained"
@@ -193,27 +277,22 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
           </Button>
         </Stack>
 
-        {/* inner bordered box: search + table + pagination */}
         <Box sx={{
           border: '1px solid rgba(255, 255, 255, 0.3)',
           borderRadius: 1,
           overflow: 'hidden',
-          width:'90%',
-          mx:'auto',
+          width: '90%',
+          mx: 'auto',
           p: 2,
-          mt:2,
-          display:'flex',
-          flexDirection:'column',
-          height:460, //
-          
-          //mb:19,
+          mt: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          height: 460,
         }}>
-
-          {/* Search + Actions */}
           <Box sx={{
             display: 'flex',
             alignItems: 'center',
-            flexShrink:0,
+            flexShrink: 0,
             justifyContent: 'space-between',
             mb: 2
           }}>
@@ -224,7 +303,7 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               sx={{
-                flex: 1, 
+                flex: 1,
                 maxWidth: '400px',
                 bgcolor: 'rgba(255,255,255,0.1)',
                 '& .MuiFilledInput-root': {
@@ -252,7 +331,6 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
                 sx={{
                   color: 'white',
                   borderColor: 'rgba(255,255,255,0.5)',
-                   
                   '&:not(.Mui-disabled):hover': {
                     borderColor: 'green',
                     backgroundColor: 'rgba(255,255,255,0.1)'
@@ -266,6 +344,7 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
               >
                 APPROVE
               </Button>
+
               <Button
                 variant="outlined"
                 disabled={!selected.length}
@@ -286,62 +365,64 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
               >
                 REJECT
               </Button>
-<RejectButton
-   openReject={openReject}
-   onCloseReject={handleCloseReject}
-   leaveRows={toRejectRows}
-   onRejected={(rejectedItems) => {
-     // remove them from your ACTIVE table
-     setActiveRows(prev => prev.filter(r => !selected.includes(r.id)))
-     setSelected([])
-     // you can also decide to switch tabs here
-     setActiveTab('CLOSED')
-     // then refresh from localStorage or however you like
-   }}
- />
+
+              <RejectButton
+                openReject={openReject}
+                onCloseReject={handleCloseReject}
+                leaveRows={toRejectRows}
+                onConfirmReject={async () => {
+                  return true
+                }}
+                onRejected={(rejectedItems) => {
+                  onRowsRejected(rejectedItems)
+                  handleCloseReject()
+                }}
+              />
             </Stack>
           </Box>
 
-          {/* Table */}
           <TableContainer component={Paper} sx={{
             maxHeight: 380,
             overflowY: 'auto',
-            flex:1,
-            mb:2,
+            flex: 1,
+            mb: 2,
             backgroundColor: 'rgba(0,0,0,0.26)',
             border: '1px solid rgba(255,255,255,0.9)',
             borderRadius: 1,
           }}>
-            {/* stickyHeader */}
-            <Table size='small' stickyHeader>  
+            <Table size='small' stickyHeader>
               <TableHead>
-                <TableRow sx={{ "& .MuiTableCell-stickyHeader": {
-      backgroundColor: "rgb(0, 0, 0)",  // your translucent blue
-      color: "white",   }}}>
+                <TableRow sx={{
+                  "& .MuiTableCell-stickyHeader": {
+                    backgroundColor: "rgb(0, 0, 0)",
+                    color: "white",
+                  }
+                }}>
                   <TableCell padding="checkbox">
                     <Checkbox
-                      checked={ selected.length === filteredRows.length }
+                      checked={allSelected}
+                      indeterminate={someSelected}
                       onChange={e =>
                         e.target.checked
-                          ? setSelected(activeRows.map(r => r.id))
+                          ? setSelected(filteredRows.map(r => r.id))
                           : setSelected([])
                       }
                       sx={{
-            color: 'white',
-                '& .MuiSvgIcon-root': {
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  borderRadius: 1,
-                },
-            '&:hover .MuiSvgIcon-root': {
-              backgroundColor: 'rgba(255, 255, 255, 0.4)',
-            }
-          }}
+                        color: 'white',
+                        '& .MuiSvgIcon-root': {
+                          backgroundColor: 'rgba(255,255,255,0.15)',
+                          borderRadius: 1,
+                        },
+                        '&:hover .MuiSvgIcon-root': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                        }
+                      }}
                     />
                   </TableCell>
                   {[
-                    'Employee ID','Emp Name','Leave Type',
-                    'Start Date','End Date','Days',
-                    'Applied On','Reason','Status'
+                    'Employee ID', 'Emp Name', 'Leave Type',
+                    'Start Date', 'End Date', 'Days',
+                    'Applied On', 'Reason', 'Status'
                   ].map(h => (
                     <TableCell
                       key={h}
@@ -349,8 +430,8 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
                         color: 'white',
                         fontWeight: 'bold',
                         backgroundColor: 'rgba(0,0,0,0.3)',
-                        py:1.5, //vertical paddding
-                        px:2,   //horizontal padding
+                        py: 1.5,
+                        px: 2,
                       }}
                     >
                       {h}
@@ -374,39 +455,37 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
                           checked={selected.includes(row.id)}
                           onChange={() => handleSelect(row.id)}
                           sx={{
-                color: 'white',
-                '& .MuiSvgIcon-root': {
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  borderRadius: 1,
-                },
-
-              }}
+                            color: 'white',
+                            '& .MuiSvgIcon-root': {
+                              backgroundColor: 'rgba(255,255,255,0.15)',
+                              borderRadius: 1,
+                            },
+                          }}
                         />
                       </TableCell>
-                      <TableCell sx={{ color: 'white', py:1.3, px:2, }}>{row.empId}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.name}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.leaveType}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2,}}>{row.startDate}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.endDate}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.days}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.appliedOn}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.reason}</TableCell>
-                      <TableCell sx={{ color: 'white', py:0.5, px:2, }}>{row.status}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 1.3, px: 2 }}>{row.empId}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.name}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.leaveType}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.startDate}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.endDate}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.days}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.appliedOn}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.reason}</TableCell>
+                      <TableCell sx={{ color: 'white', py: 0.5, px: 2 }}>{row.status}</TableCell>
                     </TableRow>
                   ))}
               </TableBody>
             </Table>
           </TableContainer>
 
-          {/* Pagination inside the same border */}
           <TablePagination
             component="div"
-           count={filteredRows.length}
+            count={filteredRows.length}
             page={page}
             rowsPerPage={rowsPerPage}
-            onPageChange={(e,newPage) => setPage(newPage)}
+            onPageChange={(e, newPage) => setPage(newPage)}
             onRowsPerPageChange={e => { setRowsPerPage(+e.target.value); setPage(0) }}
-            rowsPerPageOptions={[5,10,25]}
+            rowsPerPageOptions={[5, 10, 25]}
             sx={{
               color: 'black',
               backgroundColor: 'rgba(255,249,249,0.74)',
@@ -415,19 +494,29 @@ localStorage.setItem("leaveApprovals", JSON.stringify(updatedActive));
               '& .MuiIconButton-root': { color: 'black' }
             }}
           />
-        </Box>{/* end inner bordered box */}
-      </Box>{/* end outer box */}
+        </Box>
+      </Box>
 
-      {/* ← NEW: Snackbar at bottom center */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={1500}
         onClose={() => setSnackbarOpen(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
       >
-<Alert variant="filled" severity="success">
-  Approved successfully
-</Alert>
+        <Alert variant="filled" severity="success">
+          Approved successfully
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={rejectSnackbarOpen}
+        autoHideDuration={1500}
+        onClose={() => setRejectSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert variant="filled" severity="success">
+          Rejected successfully
+        </Alert>
       </Snackbar>
     </div>
   )

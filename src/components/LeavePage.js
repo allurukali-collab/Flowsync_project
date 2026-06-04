@@ -1,124 +1,176 @@
-import React, { useState} from 'react';
+import React, { useState } from 'react';
 import {
-  Button, Card, CardContent, MenuItem, Select, Typography, Box, Grid, TextField
+  Button,
+  Card,
+  CardContent,
+  MenuItem,
+  Select,
+  Typography,
+  Box,
+  Grid,
+  TextField,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import './../style/Leave.css';
 import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
-import { DataGrid } from '@mui/x-data-grid';
-import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import IconButton from '@mui/material/IconButton';
-import { Snackbar, Alert } from '@mui/material';
 
+dayjs.extend(isBetween);
+dayjs.extend(customParseFormat);
 
 const LeavePage = () => {
   const navigate = useNavigate();
+
   const [leaveType, setLeaveType] = useState('');
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
+  const [reason, setReason] = useState('');
   const [applyTo, setApplyTo] = useState('');
   const [selectedDate, setSelectedDate] = useState(dayjs());
-  const [showHistory, setShowHistory] = useState(false);
-  // const [selectedRows, setSelectedRows] = useState([]);
-  const user = JSON.parse(localStorage.getItem("user"));
-  const userGender = user?.gender?.toLowerCase();  // "male" or "female"
- //const [userGender, setUserGender] = useState("");
-  //const user = useSelector(state => state.auth.user);
-//const userGender = user?.gender; // e.g. "male" or "female"
+  const [showHistory] = useState(false);
 
-const [toastState, setToastState] = useState({ show: false, message: "", type: "" });
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const currentEmployeeId = String(user?.employeeId || "");
+  const currentEmployeeName = user?.name || user?.employeeName || "";
+  const userGender = user?.gender?.toLowerCase();
 
-const triggerToast = (message, type) => {
-  setToastState({ show: true, message, type });
-  setTimeout(() => {
-    setToastState({ show: false, message: "", type: "" });
-  }, 2500);
-};
+  const [toastState, setToastState] = useState({
+    show: false,
+    message: "",
+    type: ""
+  });
 
+  const triggerToast = (message, type) => {
+    setToastState({ show: true, message, type });
+    setTimeout(() => {
+      setToastState({ show: false, message: "", type: "" });
+    }, 2500);
+  };
 
   const [history, setHistory] = useState(() => {
     const stored = localStorage.getItem("leaveHistory");
     return stored ? JSON.parse(stored) : [];
   });
 
- const [leaveBalances, setLeaveBalances] = useState([
-    { code:'Annual Leave',type: 'Annual', value: 0.75 },
-    { code:'Restricted Holiday',type: 'RH', value: 8 },
-    { code:'LOP',type: 'LOP', value: 5 },
-    { code:'Privilege Leave',type: 'PL', value: 5 },
-    { code:'Maternity Leave',type: 'ML', value: 7 },
-    { code:'Sick Leave',type: 'SL', value: 10 }
-  ]);
+  const [leaveBalances, setLeaveBalances] = useState(() => {
+    const storedBalances = localStorage.getItem("leaveBalances");
+    return storedBalances
+      ? JSON.parse(storedBalances)
+      : [
+          { code: 'Annual Leave', type: 'Annual', value: 0.75 },
+          { code: 'Restricted Holiday', type: 'RH', value: 8 },
+          { code: 'LOP', type: 'LOP', value: 5 },
+          { code: 'Privilege Leave', type: 'PL', value: 5 },
+          { code: 'Maternity Leave', type: 'ML', value: 7 },
+          { code: 'Sick Leave', type: 'SL', value: 10 }
+        ];
+  });
 
   const handleClear = () => {
     setLeaveType('');
     setStartDate(null);
     setEndDate(null);
     setApplyTo('');
+    setReason('');
   };
 
   const handleApply = () => {
-    if (!startDate || !endDate || !leaveType || !applyTo) {
+    if (!startDate || !endDate || !leaveType || !applyTo || !reason.trim()) {
       triggerToast("Please fill all fields.", "error");
       return;
     }
 
-    if (leaveType === "Maternity Leave" && userGender !== "female") {
-    triggerToast("Maternity Leave can only be applied by female employees.", "error");
-    return;
-  }
-    const isDateOverlap = history.some((entry) => {
-    const existingStart = dayjs(entry.startDate, 'DD-MM-YYYY');
-    const existingEnd = dayjs(entry.endDate, 'DD-MM-YYYY');
-    return (
-      dayjs(startDate).isBetween(existingStart, existingEnd, null, '[]') ||
-      dayjs(endDate).isBetween(existingStart, existingEnd, null, '[]') ||
-      existingStart.isBetween(dayjs(startDate), dayjs(endDate), null, '[]') ||
-      existingEnd.isBetween(dayjs(startDate), dayjs(endDate), null, '[]')
-    );
-  });
+    if (dayjs(endDate).isBefore(dayjs(startDate), 'day')) {
+      triggerToast("End date cannot be before start date.", "error");
+      return;
+    }
 
-  if (isDateOverlap) {
-    triggerToast("Leave already applied for selected date(s).", "error");
-    return;
-  }
+    if (leaveType === "Maternity Leave" && userGender !== "female") {
+      triggerToast("Maternity Leave can only be applied by female employees.", "error");
+      return;
+    }
+
+    const requestedStart = dayjs(startDate).startOf('day');
+    const requestedEnd = dayjs(endDate).startOf('day');
+
+    const isDateOverlap = history.some((entry) => {
+      const entryEmployeeId = String(entry.empId || "");
+      const entryStatus = String(entry.status || "").trim().toUpperCase();
+
+      if (entryEmployeeId !== currentEmployeeId) return false;
+      if (entryStatus.includes("REJECTED") || entryStatus.includes("WITHDRAWN")) return false;
+
+      const existingStart = dayjs(entry.startDate, 'DD-MM-YYYY', true).startOf('day');
+      const existingEnd = dayjs(entry.endDate, 'DD-MM-YYYY', true).startOf('day');
+
+      if (!existingStart.isValid() || !existingEnd.isValid()) return false;
+
+      return (
+        requestedStart.isBetween(existingStart, existingEnd, 'day', '[]') ||
+        requestedEnd.isBetween(existingStart, existingEnd, 'day', '[]') ||
+        existingStart.isBetween(requestedStart, requestedEnd, 'day', '[]') ||
+        existingEnd.isBetween(requestedStart, requestedEnd, 'day', '[]')
+      );
+    });
+
+    if (isDateOverlap) {
+      triggerToast("Leave already applied for selected date(s).", "error");
+      return;
+    }
 
     const days = dayjs(endDate).diff(dayjs(startDate), 'day') + 1;
 
-// find the matching balance slot
-  const slot = leaveBalances.find(lb => lb.code === leaveType);
-  if (!slot) return; // guard
+    const slot = leaveBalances.find((lb) => lb.code === leaveType);
+    if (!slot) {
+      triggerToast("Invalid leave type selected.", "error");
+      return;
+    }
 
-// subtract the days taken
-  const newBalance = slot.value - days;
+    if (slot.value <= 0) {
+      triggerToast("Selected leave is not available.", "error");
+      return;
+    }
 
-// update state so your blue buttons immediately show the new number
-  setLeaveBalances(balances =>
-    balances.map(lb =>
+    if (slot.value < days) {
+      triggerToast("Insufficient leave balance.", "error");
+      return;
+    }
+
+    if (leaveType === "LOP" && slot.value <= 0) {
+      triggerToast("No LOP balance available.", "error");
+      return;
+    }
+
+    const updatedBalances = leaveBalances.map((lb) =>
       lb.code === leaveType
-        ? { ...lb, value: newBalance }
+        ? { ...lb, value: lb.value - days }
         : lb
-    )
-  );
+    );
 
-// now create your history entry with the updated balance
-  const newEntry = {
-    id: Date.now(),
-    empId: "10022",
-    name: "Palak",
-    leaveType,
-    startDate: dayjs(startDate).format('DD-MM-YYYY'),
-    endDate:   dayjs(endDate).format('DD-MM-YYYY'),
-    days,
-    appliedOn: dayjs().format('DD-MM-YYYY'),
-    reason:    "",
-    balance:   newBalance,
-    status:    "Withdraw Pending"
-  };
+    setLeaveBalances(updatedBalances);
+    localStorage.setItem("leaveBalances", JSON.stringify(updatedBalances));
+
+    const newEntry = {
+      id: Date.now(),
+      empId: currentEmployeeId,
+      name: currentEmployeeName,
+      leaveType,
+      startDate: dayjs(startDate).format('DD-MM-YYYY'),
+      endDate: dayjs(endDate).format('DD-MM-YYYY'),
+      days,
+      appliedOn: dayjs().format('DD-MM-YYYY'),
+      reason: reason.trim(),
+      balance: updatedBalances.find((lb) => lb.code === leaveType)?.value,
+      status: "Withdraw Pending"
+    };
 
     const updatedHistory = [...history, newEntry];
     setHistory(updatedHistory);
@@ -132,25 +184,36 @@ const triggerToast = (message, type) => {
     triggerToast("Leave applied successfully!", "success");
   };
 
-
   return (
     <Box className="leave-container">
       <IconButton
-              onClick={() => navigate('/timesheettable')}
-              sx={{ position: 'absolute', top: 16, left: 16, color: 'white' }}
-            >
-              <ArrowBackIosIcon />
-            </IconButton>
-      <Box className="leave-header">
-        <Typography variant="h5" className="leave-title">LEAVE</Typography>
+        onClick={() => navigate('/timesheettable')}
+        sx={{ position: 'absolute', top: 16, left: 16, color: 'white' }}
+      >
+        <ArrowBackIosIcon />
+      </IconButton>
 
-        <Box className="random" >
+      <Box className="leave-header">
+        <Typography variant="h5" className="leave-title">
+          LEAVE
+        </Typography>
+
+        <Box className="random">
           <Box className="leave-buttons">
-            <Button variant={showHistory ? "outlined" : "contained"} color="primary">APPLY</Button>
-            <Button variant={showHistory ? "contained" : "outlined"} className="history-button" onClick={() => navigate('/history')}>HISTORY</Button>
+            <Button variant={showHistory ? "outlined" : "contained"} color="primary">
+              APPLY
+            </Button>
+            <Button
+              variant={showHistory ? "contained" : "outlined"}
+              className="history-button"
+              onClick={() => navigate('/history')}
+            >
+              HISTORY
+            </Button>
           </Box>
 
-            <Box className="leave-content">
+          <Grid container spacing={2} className="leave-content">
+            <Grid item xs={12} md={2}>
               <Box className="left-panel">
                 {leaveBalances.map((leave, index) => (
                   <Button
@@ -170,24 +233,27 @@ const triggerToast = (message, type) => {
                   </Button>
                 ))}
               </Box>
+            </Grid>
 
+            <Grid item xs={12} md={5}>
               <Box className="calendar-panel">
                 <Typography variant="h6">Select Dates</Typography>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DateCalendar
                     value={selectedDate}
-                   onChange={(newValue) => {
-  setSelectedDate(newValue);
-  if (!startDate || (startDate && endDate)) {
-    setStartDate(newValue);
-    setEndDate(null);
-  } else if (!endDate && (newValue.isSame(startDate) || newValue.isAfter(startDate))) {
-    // ✅ Allow same day or future date
-    setEndDate(newValue);
-  } else {
-    
-  }
-}}
+                    onChange={(newValue) => {
+                      setSelectedDate(newValue);
+
+                      if (!startDate || (startDate && endDate)) {
+                        setStartDate(newValue);
+                        setEndDate(null);
+                      } else if (
+                        !endDate &&
+                        (newValue.isSame(startDate, 'day') || newValue.isAfter(startDate, 'day'))
+                      ) {
+                        setEndDate(newValue);
+                      }
+                    }}
                     sx={{
                       '.MuiPickersDay-root': {
                         color: 'white',
@@ -212,18 +278,17 @@ const triggerToast = (message, type) => {
                         color: 'white',
                         fontSize: '1.2rem',
                       },
-                      '.MuiPickersCalendarHeader-switchViewIcon, .MuiSvgIcon-root': {
-                        color: 'white',
-                      },
-                      '.MuiPickersCalendarHeader-labelContainer': {
+                      '.MuiSvgIcon-root': {
                         color: 'white',
                       },
                     }}
                   />
                 </LocalizationProvider>
               </Box>
+            </Grid>
 
-              <Card className="form-panel" sx={{ backgroundColor: ' rgba(255, 255, 255, 0.7)' }}>
+            <Grid item xs={12} md={4}>
+              <Card className="form-panel" sx={{ backgroundColor: 'rgba(255,255,255,0.7)' }}>
                 <CardContent>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <Select
@@ -231,100 +296,106 @@ const triggerToast = (message, type) => {
                       onChange={(e) => setLeaveType(e.target.value)}
                       displayEmpty
                       fullWidth
-                      style={{ marginBottom: '16px' }}
+                      sx={{ mb: 2 }}
                     >
                       <MenuItem value="" disabled>Leave Type</MenuItem>
                       <MenuItem value="Annual Leave">AL</MenuItem>
                       <MenuItem value="Restricted Holiday">RH</MenuItem>
                       <MenuItem value="LOP">LOP</MenuItem>
-                      {userGender !== "female" && (
-                      <MenuItem value="Privilege Leave" >PL</MenuItem>
-                      )}
+                      <MenuItem value="Privilege Leave">PL</MenuItem>
                       {userGender === "female" && (
-                      <MenuItem value="Maternity Leave" >ML</MenuItem>
+                        <MenuItem value="Maternity Leave">ML</MenuItem>
                       )}
                       <MenuItem value="Sick Leave">SL</MenuItem>
                     </Select>
 
-                    <DatePicker
-                      label="Start Date"
-                      value={startDate}
-                      onChange={(newValue) => setStartDate(newValue)}
-                      format="DD-MM-YYYY"
-                      enableAccessibleFieldDOMStructure={false}
-                      slots={{
-                        openPickerIcon: () => null,
-                        textField: (params) => (
-                          <TextField
-                            {...params}
-                            fullWidth
-                            inputProps={{
-                              ...params.inputProps,
-                            }}
-                          />
-                        ),
-                      }}
-                    />
-                    <br /><br />
-                    <DatePicker
-                      label="End Date"
-                      value={endDate}
-                      onChange={(newValue) => setEndDate(newValue)}
-                      format="DD-MM-YYYY"
-                      enableAccessibleFieldDOMStructure={false}
-                      slots={{
-                        openPickerIcon: () => null,
-                        textField: (params) => (
-                          <TextField
-                            {...params}
-                            fullWidth
-                            inputProps={{
-                              ...params.inputProps,
-                         
-                            }}
-                          />
-                        ),
-                      }}
-                    />
-                    <br /><br />
+                    <Box>
+                      <DatePicker
+                        label="Start Date"
+                        value={startDate}
+                        onChange={(newValue) => setStartDate(newValue)}
+                        format="DD-MM-YYYY"
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            sx: { width: '100%' }
+                          }
+                        }}
+                      />
+                    </Box>
+
+                    <Box sx={{ mt: 2 }}>
+                      <DatePicker
+                        label="End Date"
+                        value={endDate}
+                        onChange={(newValue) => setEndDate(newValue)}
+                        format="DD-MM-YYYY"
+                        slotProps={{
+                          textField: {
+                            fullWidth: true,
+                            sx: { width: '100%' }
+                          }
+                        }}
+                      />
+                    </Box>
+
+                    <Box sx={{ mt: 2 }}>
+                      <TextField
+                        label="Reason"
+                        multiline
+                        rows={1}
+                        fullWidth
+                        sx={{ width: '100%' }}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                      />
+                    </Box>
+
                     <Select
                       value={applyTo}
                       onChange={(e) => setApplyTo(e.target.value)}
                       displayEmpty
                       fullWidth
+                      sx={{ mt: 2 }}
                     >
                       <MenuItem value="" disabled>Apply To</MenuItem>
                       <MenuItem value="Niranjan Achutharam">Pankaj</MenuItem>
                     </Select>
-                    <br /><br />
-                    <Grid container spacing={1} sx={{ justifyContent: 'center' }}>
+
+                    <Grid container spacing={1} sx={{ mt: 2 }}>
                       <Grid item xs={6}>
-                        <Button fullWidth variant="outlined" color="error" onClick={handleClear}>CLEAR</Button>
+                        <Button fullWidth variant="outlined" color="error" onClick={handleClear}>
+                          CLEAR
+                        </Button>
                       </Grid>
                       <Grid item xs={6}>
-                        <Button fullWidth variant="contained" color="primary" onClick={handleApply}>APPLY</Button>
+                        <Button fullWidth variant="contained" onClick={handleApply}>
+                          APPLY
+                        </Button>
                       </Grid>
                     </Grid>
                   </LocalizationProvider>
                 </CardContent>
               </Card>
-            </Box>
+            </Grid>
+          </Grid>
         </Box>
+
         <Snackbar
-  open={toastState.show}
-  autoHideDuration={3000}
-  onClose={() => setToastState({ show: false, message: "", type: "" })}
-  anchorOrigin={{ vertical: "top", horizontal: "right" }}
->
-  <Alert
-    onClose={() => setToastState({ show: false, message: "", type: "" })}
-    severity={toastState.type}
-    variant="filled"
-    sx={{ width: "100%" }}
-  >
-    {toastState.message}
-  </Alert>
-</Snackbar>
+          open={toastState.show}
+          autoHideDuration={3000}
+          onClose={() => setToastState({ show: false, message: "", type: "" })}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setToastState({ show: false, message: "", type: "" })}
+            severity={toastState.type}
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
+            {toastState.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Box>
   );

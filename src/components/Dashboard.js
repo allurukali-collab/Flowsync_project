@@ -180,6 +180,8 @@ import workflow from "../image/workflow.jpg";
 import People from "../image/People.jpg";
 import about from "../image/about.jpg";
 import "./../style/Dashboard.css";
+import { getAuthHeaders } from "../utils/api";
+import { MODULE_ROUTES } from "../constants/modules";
 
 function safeParseUser() {
   try {
@@ -214,7 +216,9 @@ function Dashboard() {
   useEffect(() => {
     if (!user?.employeeId) return;
 
-    fetch(`http://localhost:8080/api/auth/dashboard/${user.employeeId}`)
+    fetch(`http://localhost:8080/api/auth/dashboard/${user.employeeId}`, {
+      headers: getAuthHeaders(),
+    })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -258,32 +262,23 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     navigate("/");
   };
 
   const cards = [
-    {
-      key: "WORK_TRACKER",
-      title: "Work Tracker",
-      image: time,
-      route: "/timesheettable",
-    },
-    { key: "REPORTS", title: "Reports", image: reports, route: "/reports" },
-    { key: "CAREERS", title: "Careers", image: careers },
-    { key: "LEARNING", title: "Learning", image: learn },
-    {
-      key: "EMPLOYEE_DASHBOARD",
-      title: "Employee Dashboard",
-      image: Empdash,
-      route: "/welcome",
-    },
-    { key: "MORE_APPS", title: "More Apps", image: more },
-    { key: "DOCUMENT_CENTER", title: "Document Center", image: doc },
-    { key: "TESTIMONIALS", title: "Testimonials", image: testimonials },
-    { key: "FEEDS", title: "Feeds", image: feed },
-    { key: "WORKFLOW_DELEGATES", title: "Workflow Delegates", image: workflow },
-    { key: "PEOPLE", title: "People", image: People },
-    { key: "ABOUT", title: "About", image: about },
+    { key: "WORK_TRACKER", title: "Work Tracker", image: time, route: MODULE_ROUTES.WORK_TRACKER },
+    { key: "REPORTS", title: "Reports", image: reports, route: MODULE_ROUTES.REPORTS },
+    { key: "CAREERS", title: "Careers", image: careers, route: MODULE_ROUTES.CAREERS },
+    { key: "LEARNING", title: "Learning", image: learn, route: MODULE_ROUTES.LEARNING },
+    { key: "EMPLOYEE_DASHBOARD", title: "Employee Dashboard", image: Empdash, route: MODULE_ROUTES.EMPLOYEE_DASHBOARD },
+    { key: "MORE_APPS", title: "More Apps", image: more, route: MODULE_ROUTES.MORE_APPS },
+    { key: "DOCUMENT_CENTER", title: "Document Center", image: doc, route: MODULE_ROUTES.DOCUMENT_CENTER },
+    { key: "TESTIMONIALS", title: "Testimonials", image: testimonials, route: MODULE_ROUTES.TESTIMONIALS },
+    { key: "FEEDS", title: "Feeds", image: feed, route: MODULE_ROUTES.FEEDS },
+    { key: "WORKFLOW_DELEGATES", title: "Workflow Delegates", image: workflow, route: MODULE_ROUTES.WORKFLOW_DELEGATES },
+    { key: "PEOPLE", title: "People", image: People, route: MODULE_ROUTES.PEOPLE },
+    { key: "ABOUT", title: "About", image: about, route: MODULE_ROUTES.ABOUT },
   ];
 
   const allowedModules = dashboardData?.allowedModules || [];
@@ -343,10 +338,14 @@ function Dashboard() {
             <div
               className={`card ${!allowed ? "card-disabled" : ""}`}
               key={idx}
-              onClick={() => allowed && card.route && navigate(card.route)}
+              onClick={() => {
+                if (!allowed) return;
+                if (card.route) navigate(card.route);
+              }}
               style={{
-                cursor: allowed && card.route ? "pointer" : "not-allowed",
+                cursor: allowed ? "pointer" : "not-allowed",
                 opacity: allowed ? 1 : 0.5,
+                pointerEvents: allowed ? "auto" : "none",
               }}
             >
               <img src={card.image} alt={card.title} />

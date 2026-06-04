@@ -14,7 +14,15 @@ const api = axios.create({
 // Add token to every request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    let token = localStorage.getItem('token');
+    if (!token) {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        token = user?.token;
+      } catch {
+        token = null;
+      }
+    }
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -25,17 +33,22 @@ api.interceptors.request.use(
   }
 );
 
-// Handle 401 errors (redirect to login)
+// Handle 401/403 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/';
+      window.location.hash = '#/';
     }
     return Promise.reject(error);
   }
 );
+
+export function getAuthHeaders() {
+  const token = localStorage.getItem('token') || JSON.parse(localStorage.getItem('user') || '{}')?.token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export default api;
