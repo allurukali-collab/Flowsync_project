@@ -3,6 +3,8 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -15,23 +17,18 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import BusinessCenterIcon from "@mui/icons-material/BusinessCenter";
+import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
 import CloseIcon from "@mui/icons-material/Close";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE_URL = "http://localhost:8080";
@@ -40,7 +37,7 @@ const emptyForm = {
   jobTitle: "",
   department: "",
   location: "",
-  employmentType: "",
+  employmentType: "Full Time",
   experience: "",
   description: "",
   skills: "",
@@ -50,20 +47,29 @@ const emptyForm = {
 };
 
 const getCareerType = (career) => {
-  return (
+  const type =
     career?.employmentType ||
-    career?.type ||
     career?.jobType ||
+    career?.type ||
     career?.employment_type ||
-    "-"
-  );
+    "";
+
+  return type && String(type).trim() ? type : "Full Time";
 };
 
 const getStatus = (career) => {
   return String(career?.status || "OPEN").toUpperCase();
 };
 
-export default function Careers() {
+const formatDate = (dateValue) => {
+  if (!dateValue) {
+    return "No closing date";
+  }
+
+  return String(dateValue).split("T")[0];
+};
+
+export default function Career() {
   const navigate = useNavigate();
 
   const [careers, setCareers] = useState([]);
@@ -148,9 +154,7 @@ export default function Careers() {
   };
 
   const handleCloseDialog = () => {
-    if (saving) {
-      return;
-    }
+    if (saving) return;
 
     setOpenDialog(false);
     setForm(emptyForm);
@@ -166,11 +170,10 @@ export default function Careers() {
 
     try {
       const payload = {
-        ...form,
         jobTitle: form.jobTitle.trim(),
         department: form.department.trim(),
         location: form.location.trim(),
-        employmentType: form.employmentType.trim(),
+        employmentType: form.employmentType.trim() || "Full Time",
         experience: form.experience.trim(),
         description: form.description.trim(),
         skills: form.skills.trim(),
@@ -211,12 +214,9 @@ export default function Careers() {
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/careers/${careerId}/close`,
-        {
-          method: "PUT",
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/careers/${careerId}/close`, {
+        method: "PUT",
+      });
 
       if (!response.ok) {
         throw new Error("Unable to close career opening");
@@ -238,7 +238,7 @@ export default function Careers() {
         py: 3,
         color: "white",
         background:
-          "radial-gradient(circle at top left, rgba(0,188,212,0.18), transparent 30%), linear-gradient(135deg, #071225 0%, #0f1d3c 45%, #132447 100%)",
+          "radial-gradient(circle at top left, rgba(0,188,212,0.18), transparent 30%), linear-gradient(135deg, #071225 0%, #101d3d 45%, #132447 100%)",
       }}
     >
       <Paper
@@ -358,108 +358,73 @@ export default function Careers() {
         />
       </Paper>
 
-      <Paper
-        elevation={0}
-        sx={{
-          borderRadius: 4,
-          overflow: "hidden",
-          background: "rgba(15,31,65,0.94)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          boxShadow: "0 18px 45px rgba(0,0,0,0.22)",
-        }}
-      >
-        <Box
+      {loading ? (
+        <Box sx={{ p: 7, textAlign: "center" }}>
+          <CircularProgress />
+        </Box>
+      ) : filteredCareers.length === 0 ? (
+        <Paper
+          elevation={0}
           sx={{
-            px: 3,
-            py: 2.4,
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 2,
+            p: 8,
+            textAlign: "center",
+            color: "white",
+            borderRadius: 4,
+            background: "rgba(15,31,65,0.94)",
+            border: "1px solid rgba(255,255,255,0.1)",
           }}
         >
-          <Box>
-            <Typography variant="h6" fontWeight={900} color="white">
-              Career Openings
-            </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.6)", fontSize: 14 }}>
-              Showing {filteredCareers.length} of {careers.length} records
-            </Typography>
-          </Box>
-
-          <Chip
-            label={`${openCount} Open`}
-            size="small"
+          <WorkOutlineIcon
             sx={{
-              color: "#8df5a6",
-              bgcolor: "rgba(76,175,80,0.15)",
-              fontWeight: 900,
-              px: 1,
+              fontSize: 64,
+              color: "rgba(255,255,255,0.35)",
+              mb: 2,
             }}
           />
-        </Box>
 
-        {loading ? (
-          <Box sx={{ p: 7, textAlign: "center" }}>
-            <CircularProgress />
-          </Box>
-        ) : filteredCareers.length === 0 ? (
-          <Box sx={{ p: 8, textAlign: "center", color: "white" }}>
-            <WorkOutlineIcon
-              sx={{
-                fontSize: 64,
-                color: "rgba(255,255,255,0.35)",
-                mb: 2,
-              }}
-            />
+          <Typography variant="h6" fontWeight={900}>
+            No job openings available
+          </Typography>
 
-            <Typography variant="h6" fontWeight={900}>
-              No job openings available
-            </Typography>
+          <Typography sx={{ color: "rgba(255,255,255,0.65)", mt: 1 }}>
+            Create your first job opening using the Add New button.
+          </Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={2.5}>
+          {filteredCareers.map((career) => {
+            const status = getStatus(career);
+            const isOpen = status === "OPEN";
+            const careerType = getCareerType(career);
 
-            <Typography sx={{ color: "rgba(255,255,255,0.65)", mt: 1 }}>
-              Create your first job opening using the Add New button.
-            </Typography>
-          </Box>
-        ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow
+            return (
+              <Grid item xs={12} md={6} lg={4} key={career.careerId}>
+                <Card
                   sx={{
+                    height: "100%",
+                    borderRadius: 4,
                     background:
-                      "linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
+                      "linear-gradient(145deg, rgba(18,35,72,0.97), rgba(10,24,52,0.97))",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "white",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.22)",
+                    transition: "0.22s ease",
+                    "&:hover": {
+                      transform: "translateY(-4px)",
+                      borderColor: "rgba(0,188,212,0.42)",
+                      boxShadow: "0 20px 50px rgba(0,188,212,0.12)",
+                    },
                   }}
                 >
-                  <HeaderCell>Job Details</HeaderCell>
-                  <HeaderCell>Department</HeaderCell>
-                  <HeaderCell>Location</HeaderCell>
-                  <HeaderCell>Type</HeaderCell>
-                  <HeaderCell>Experience</HeaderCell>
-                  <HeaderCell>Status</HeaderCell>
-                  <HeaderCell align="right">Action</HeaderCell>
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                {filteredCareers.map((career) => {
-                  const status = getStatus(career);
-                  const isOpen = status === "OPEN";
-                  const careerType = getCareerType(career);
-
-                  return (
-                    <TableRow
-                      key={career.careerId}
-                      sx={{
-                        transition: "0.2s ease",
-                        "&:hover": {
-                          background: "rgba(0,188,212,0.06)",
-                        },
-                      }}
+                  <CardContent sx={{ p: 3 }}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      spacing={2}
                     >
-                      <BodyCell>
-                        <Typography fontWeight={900}>
+                      <Box>
+                        <Typography variant="h6" fontWeight={900}>
                           {career.jobTitle || "-"}
                         </Typography>
 
@@ -468,111 +433,120 @@ export default function Careers() {
                             color: "rgba(255,255,255,0.58)",
                             fontSize: 13,
                             mt: 0.6,
-                            maxWidth: 360,
                           }}
                         >
-                          Skills: {career.skills || "-"}
+                          Posted by {career.postedBy || "Admin"}
                         </Typography>
-                      </BodyCell>
+                      </Box>
 
-                      <BodyCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <ApartmentOutlinedIcon
-                            sx={{
-                              fontSize: 18,
-                              color: "rgba(255,255,255,0.45)",
-                            }}
-                          />
-                          <span>{career.department || "-"}</span>
-                        </Stack>
-                      </BodyCell>
+                      <Chip
+                        label={status}
+                        size="small"
+                        sx={{
+                          fontWeight: 900,
+                          color: isOpen ? "#8df5a6" : "#80d8ff",
+                          bgcolor: isOpen
+                            ? "rgba(76,175,80,0.18)"
+                            : "rgba(3,169,244,0.18)",
+                          borderRadius: 2,
+                        }}
+                      />
+                    </Stack>
 
-                      <BodyCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <LocationOnOutlinedIcon
-                            sx={{
-                              fontSize: 18,
-                              color: "rgba(255,255,255,0.45)",
-                            }}
-                          />
-                          <span>{career.location || "-"}</span>
-                        </Stack>
-                      </BodyCell>
+                    <Stack spacing={1.4} sx={{ mt: 2.5 }}>
+                      <InfoRow icon={<ApartmentOutlinedIcon />} label={career.department || "-"} />
+                      <InfoRow icon={<LocationOnOutlinedIcon />} label={career.location || "-"} />
+                      <InfoRow icon={<BusinessCenterIcon />} label={careerType} />
+                      <InfoRow icon={<WorkOutlineIcon />} label={career.experience || "Experience not added"} />
+                      <InfoRow icon={<CalendarMonthIcon />} label={`Closing: ${formatDate(career.closingDate)}`} />
+                    </Stack>
 
-                      <BodyCell>
-                        <Chip
-                          label={careerType}
+                    <Box sx={{ mt: 2.5 }}>
+                      <Typography
+                        sx={{
+                          color: "rgba(255,255,255,0.7)",
+                          fontSize: 13,
+                          fontWeight: 800,
+                          mb: 0.8,
+                        }}
+                      >
+                        Skills
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          color: "rgba(255,255,255,0.58)",
+                          fontSize: 14,
+                          minHeight: 40,
+                        }}
+                      >
+                        {career.skills || "Not added"}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ mt: 2.5 }}>
+                      <Typography
+                        sx={{
+                          color: "rgba(255,255,255,0.7)",
+                          fontSize: 13,
+                          fontWeight: 800,
+                          mb: 0.8,
+                        }}
+                      >
+                        Description
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          color: "rgba(255,255,255,0.58)",
+                          fontSize: 14,
+                          minHeight: 52,
+                        }}
+                      >
+                        {career.description || "No description added"}
+                      </Typography>
+                    </Box>
+
+                    <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 3 }}>
+                      {isOpen ? (
+                        <Button
                           size="small"
+                          variant="outlined"
+                          startIcon={<CloseIcon />}
+                          onClick={() => handleCloseCareer(career.careerId)}
                           sx={{
-                            bgcolor: "rgba(255,255,255,0.08)",
-                            color: "rgba(255,255,255,0.9)",
+                            color: "#ff8a80",
+                            borderColor: "rgba(255,138,128,0.45)",
+                            textTransform: "none",
                             fontWeight: 800,
                             borderRadius: 2,
+                            "&:hover": {
+                              borderColor: "#ff8a80",
+                              bgcolor: "rgba(255,138,128,0.08)",
+                            },
                           }}
-                        />
-                      </BodyCell>
-
-                      <BodyCell>{career.experience || "-"}</BodyCell>
-
-                      <BodyCell>
+                        >
+                          Close Opening
+                        </Button>
+                      ) : (
                         <Chip
-                          label={status}
+                          label="Closed"
                           size="small"
                           sx={{
-                            fontWeight: 900,
-                            letterSpacing: 0.4,
-                            color: isOpen ? "#8df5a6" : "#80d8ff",
-                            bgcolor: isOpen
-                              ? "rgba(76,175,80,0.18)"
-                              : "rgba(3,169,244,0.18)",
-                            border: isOpen
-                              ? "1px solid rgba(141,245,166,0.18)"
-                              : "1px solid rgba(128,216,255,0.18)",
-                            borderRadius: 2,
+                            color: "rgba(255,255,255,0.55)",
+                            bgcolor: "rgba(255,255,255,0.08)",
+                            fontWeight: 800,
                           }}
                         />
-                      </BodyCell>
-
-                      <BodyCell align="right">
-                        {isOpen ? (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<CloseIcon />}
-                            onClick={() => handleCloseCareer(career.careerId)}
-                            sx={{
-                              color: "#ff8a80",
-                              borderColor: "rgba(255,138,128,0.45)",
-                              textTransform: "none",
-                              fontWeight: 800,
-                              borderRadius: 2,
-                              "&:hover": {
-                                borderColor: "#ff8a80",
-                                bgcolor: "rgba(255,138,128,0.08)",
-                              },
-                            }}
-                          >
-                            Close
-                          </Button>
-                        ) : (
-                          <Typography
-                            sx={{
-                              color: "rgba(255,255,255,0.45)",
-                              fontWeight: 700,
-                            }}
-                          >
-                            Closed
-                          </Typography>
-                        )}
-                      </BodyCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
+      )}
 
       <Dialog
         open={openDialog}
@@ -591,6 +565,7 @@ export default function Careers() {
       >
         <DialogTitle sx={{ fontWeight: 900, pb: 1 }}>
           Add New Career Opening
+
           <Typography
             sx={{
               color: "rgba(255,255,255,0.62)",
@@ -728,11 +703,7 @@ export default function Careers() {
               "&:hover": { bgcolor: "#00a3bb" },
             }}
           >
-            {saving ? (
-              <CircularProgress size={22} color="inherit" />
-            ) : (
-              "Create Opening"
-            )}
+            {saving ? <CircularProgress size={22} color="inherit" /> : "Create Opening"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -798,37 +769,30 @@ function SummaryCard({ title, value, icon }) {
   );
 }
 
-function HeaderCell({ children, align = "left" }) {
+function InfoRow({ icon, label }) {
   return (
-    <TableCell
-      align={align}
-      sx={{
-        color: "rgba(255,255,255,0.75)",
-        fontWeight: 900,
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
-        py: 2,
-        fontSize: 14,
-        whiteSpace: "nowrap",
-      }}
+    <Stack
+      direction="row"
+      spacing={1.2}
+      alignItems="center"
+      sx={{ color: "rgba(255,255,255,0.72)", fontSize: 14 }}
     >
-      {children}
-    </TableCell>
-  );
-}
+      <Box
+        sx={{
+          color: "#00d8f0",
+          display: "flex",
+          "& svg": {
+            fontSize: 19,
+          },
+        }}
+      >
+        {icon}
+      </Box>
 
-function BodyCell({ children, align = "left" }) {
-  return (
-    <TableCell
-      align={align}
-      sx={{
-        color: "white",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        py: 2.2,
-        fontSize: 14,
-      }}
-    >
-      {children}
-    </TableCell>
+      <Typography sx={{ fontSize: 14, color: "rgba(255,255,255,0.72)" }}>
+        {label}
+      </Typography>
+    </Stack>
   );
 }
 
